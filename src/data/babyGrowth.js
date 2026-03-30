@@ -1,0 +1,178 @@
+export const babyGrowthData = [
+  {
+    month: 1,
+    size: 'a poppy seed',
+    emoji: '🌱',
+    sizeInCm: '0.2 cm',
+    weight: 'less than 1g',
+    description: 'Your baby has just started! Tiny cells are forming the foundations of a new life.',
+    development: 'The neural tube, which becomes the brain and spinal cord, is beginning to form.',
+    bodyChanges: [
+      'You may feel very tired',
+      'Slight nausea is common',
+      'Breast tenderness may begin',
+    ],
+    tips: [
+      'Start taking folic acid if not already',
+      'Avoid alcohol and smoking',
+      'Rest when you feel tired',
+    ],
+  },
+  {
+    month: 2,
+    size: 'a kidney bean',
+    emoji: '🫘',
+    sizeInCm: '2.5 cm',
+    weight: '4g',
+    description: 'Your baby is now forming tiny fingers and eyes! Movement has begun, though you cannot feel it yet.',
+    development: 'The heart is beating and major organs are forming. Tiny arm and leg buds are growing.',
+    bodyChanges: [
+      'Morning sickness may peak',
+      'Frequent urination begins',
+      'Fatigue is very common',
+    ],
+    tips: [
+      'Eat small frequent meals for nausea',
+      'Stay hydrated',
+      'Attend your first prenatal appointment',
+    ],
+  },
+  {
+    month: 3,
+    size: 'a lime',
+    emoji: '🍋',
+    sizeInCm: '7.5 cm',
+    weight: '28g',
+    description: 'Fingers and toes are fully formed! Your baby can now open and close their fists.',
+    development: 'Kidneys are working, fingernails and toenails are forming. The face looks more human.',
+    bodyChanges: [
+      'Baby bump may start showing',
+      'Nausea may begin to ease',
+      'Energy levels may improve',
+    ],
+    tips: [
+      'Do light walking for 20-30 minutes daily',
+      'Continue prenatal vitamins',
+      'Wear comfortable clothing',
+    ],
+  },
+  {
+    month: 4,
+    size: 'an avocado',
+    emoji: '🥑',
+    sizeInCm: '15 cm',
+    weight: '140g',
+    description: 'You may start to feel gentle movements! Your baby is practicing sucking and swallowing.',
+    development: 'The skin is forming, eyebrows and eyelashes are growing. Hearing is developing.',
+    bodyChanges: [
+      'You may feel first baby movements (flutters)',
+      'Appetite usually returns',
+      'Round ligament pain may occur',
+    ],
+    tips: [
+      'Start sleeping on your side',
+      'Talk and sing to your baby',
+      'Begin gentle prenatal exercises',
+    ],
+  },
+  {
+    month: 5,
+    size: 'a mango',
+    emoji: '🥭',
+    sizeInCm: '26 cm',
+    weight: '300g',
+    description: 'Your baby can now hear your voice! They are moving around quite a lot inside.',
+    development: 'The baby is covered in fine hair (lanugo). They can hear sounds and may respond to music.',
+    bodyChanges: [
+      'Visible baby bump',
+      'Backaches may begin',
+      'Skin changes may appear',
+    ],
+    tips: [
+      'Sleep with a pillow between your knees',
+      'Avoid standing for long periods',
+      'Stay hydrated - drink 8 glasses daily',
+    ],
+  },
+  {
+    month: 6,
+    size: 'a papaya',
+    emoji: '🌿',
+    sizeInCm: '35 cm',
+    weight: '660g',
+    description: 'Baby is now responding to light and sound. You can feel strong kicks and movements!',
+    development: 'Eyes are fully formed and can open. The baby is practicing breathing movements.',
+    bodyChanges: [
+      'Strong baby kicks felt regularly',
+      'Braxton Hicks contractions may begin',
+      'Swelling in feet may occur',
+    ],
+    tips: [
+      'Count fetal movements daily',
+      'Elevate feet when sitting',
+      'Consider a birth plan',
+    ],
+  },
+  {
+    month: 7,
+    size: 'a coconut',
+    emoji: '🥥',
+    sizeInCm: '41 cm',
+    weight: '1.0 kg',
+    description: 'Your baby is gaining weight rapidly and preparing for life outside. Brain development is accelerating.',
+    development: 'The baby can now recognize your voice. Fat layers are forming to keep warm after birth.',
+    bodyChanges: [
+      'Shortness of breath as baby grows',
+      'Heartburn is common',
+      'Frequent urination returns',
+    ],
+    tips: [
+      'Sleep propped up slightly for heartburn',
+      'Prepare for birth with prenatal classes',
+      'Pack your hospital bag',
+    ],
+  },
+  {
+    month: 8,
+    size: 'a pineapple',
+    emoji: '🍍',
+    sizeInCm: '46 cm',
+    weight: '2.0 kg',
+    description: 'Almost there! Baby is getting into position for birth. Their lungs are nearly fully developed.',
+    development: 'The baby is running out of room to move but you will feel strong pushes. Brain development is rapid.',
+    bodyChanges: [
+      'Pelvic pressure increases',
+      'Trouble sleeping is common',
+      'Colostrum may leak from breasts',
+    ],
+    tips: [
+      'Rest as much as possible',
+      'Learn signs of labor',
+      'Confirm hospital/birth center details',
+    ],
+  },
+  {
+    month: 9,
+    size: 'a watermelon',
+    emoji: '🍉',
+    sizeInCm: '51 cm',
+    weight: '3.4 kg',
+    description: 'Your baby is fully ready to meet you! They are in position and could arrive any day now.',
+    development: 'Lungs are fully mature. The baby is storing fat and getting ready for birth.',
+    bodyChanges: [
+      'Baby drops lower (lightening)',
+      'Strong Braxton Hicks contractions',
+      'Nesting instinct may be strong',
+    ],
+    tips: [
+      'Watch for signs of real labor',
+      'Stay calm and positive',
+      'Call your doctor if contractions are regular',
+    ],
+  },
+];
+
+export const getBabyData = (month) => {
+  const index = Math.max(0, Math.min(8, (month || 1) - 1));
+  return babyGrowthData[index];
+};
