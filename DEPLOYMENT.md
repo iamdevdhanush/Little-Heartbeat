@@ -1,6 +1,6 @@
-# Little Heartbeat - Deployment Guide
+# Little Heartbeat - Deployment Guid
 
-This guide covers deploying your Little Heartbeat pregnancy safety app as a **Progressive Web App (PWA)** for hackathon demos.
+This guide covers deploying your Little Heartbeat pregnancy safety app as a **Progressive Web App (PWA)** for hackathon demo.
 
 ---
 
