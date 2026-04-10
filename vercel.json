@@ -1,10 +1,9 @@
 {
-  "framework": null,
-  "buildCommand": "exit 0",
+  "framework": "static",
+  "buildCommand": "echo 'Static site - using pre-built dist'",
   "outputDirectory": "dist",
-  "installCommand": "exit 0",
+  "installCommand": "npm install --ignore-scripts",
   "cleanUrls": true,
-  "trailingSlash": false,
   "rewrites": [
     { "source": "/(.*)", "destination": "/index.html" }
   ],
@@ -20,13 +19,6 @@
       "source": "/manifest.json",
       "headers": [
         { "key": "Content-Type", "value": "application/manifest+json" }
-      ]
-    },
-    {
-      "source": "/_expo/static/(.*)",
-      "headers": [
-        { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" },
-        { "key": "Access-Control-Allow-Origin", "value": "*" }
       ]
     }
   ]
