@@ -17,6 +17,7 @@
     
     "deploy:vercel": "npm run build:web && npx vercel --prod",
     "deploy:vercel:dry": "npm run build:web && npx vercel",
+    "deploy:vercel:prebuilt": "npm run build:web && Copy-Item vercel-prebuilt.json vercel.json -Force && npx vercel --prod && Copy-Item vercel.json vercel-prebuilt.json -Force",
     
     "vercel:dev": "vercel dev"
   },
