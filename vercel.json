@@ -1,7 +1,7 @@
 {
-  "buildCommand": "npx expo export --platform web --output-dir dist",
+  "buildCommand": "ls -la dist/",
   "outputDirectory": "dist",
-  "installCommand": "npm install",
+  "installCommand": "ls -la",
   "cleanUrls": true,
   "rewrites": [
     { "source": "/(.*)", "destination": "/index.html" }
