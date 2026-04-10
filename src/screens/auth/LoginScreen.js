@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   StyleSheet, Text, View, TouchableOpacity,
-  KeyboardAvoidingView, Platform, ScrollView, Alert,
+  KeyboardAvoidingView, Platform, ScrollView,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -9,18 +9,17 @@ import { colors, radius, shadows } from '../../theme/colors';
 import Button from '../../components/common/Button';
 import Input from '../../components/common/Input';
 import { setLoggedIn } from '../../services/storageService';
-import { useApp } from '../../context/AppContext';
+import { showAlert } from '../../utils/webAlert';
 
 export default function LoginScreen({ navigation }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const insets = useSafeAreaInsets();
-  const { updateProfile } = useApp();
 
   const handleLogin = async () => {
     if (!email || !password) {
-      Alert.alert('Please fill in all fields');
+      await showAlert('Error', 'Please fill in all fields');
       return;
     }
     setLoading(true);

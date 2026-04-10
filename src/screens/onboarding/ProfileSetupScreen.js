@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   StyleSheet, Text, View, ScrollView,
-  TouchableOpacity, Alert, Platform, KeyboardAvoidingView,
+  TouchableOpacity, Platform, KeyboardAvoidingView,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -9,6 +9,7 @@ import { colors, radius, shadows } from '../../theme/colors';
 import Button from '../../components/common/Button';
 import Input from '../../components/common/Input';
 import { useApp } from '../../context/AppContext';
+import { showAlert } from '../../utils/webAlert';
 
 const MONTHS = [1,2,3,4,5,6,7,8,9];
 const REGIONS = [
@@ -34,7 +35,7 @@ export default function ProfileSetupScreen({ navigation, route }) {
 
   const handleSave = async () => {
     if (!name || !age || !pregnancyMonth || !region) {
-      Alert.alert('Please complete all required fields');
+      await showAlert('Error', 'Please complete all required fields');
       return;
     }
     setLoading(true);
@@ -90,9 +91,9 @@ export default function ProfileSetupScreen({ navigation, route }) {
 
               <Button
                 title="Next →"
-                onPress={() => {
+                onPress={async () => {
                   if (!name || !age || !pregnancyMonth || !region) {
-                    Alert.alert('Please fill in all required fields');
+                    await showAlert('Error', 'Please fill in all required fields');
                     return;
                   }
                   setStep(2);

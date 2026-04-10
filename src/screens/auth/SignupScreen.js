@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   StyleSheet, Text, View, TouchableOpacity,
-  KeyboardAvoidingView, Platform, ScrollView, Alert,
+  KeyboardAvoidingView, Platform, ScrollView,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -9,6 +9,7 @@ import { colors, radius, shadows } from '../../theme/colors';
 import Button from '../../components/common/Button';
 import Input from '../../components/common/Input';
 import { setLoggedIn } from '../../services/storageService';
+import { showAlert } from '../../utils/webAlert';
 
 export default function SignupScreen({ navigation }) {
   const [name, setName] = useState('');
@@ -19,7 +20,7 @@ export default function SignupScreen({ navigation }) {
 
   const handleSignup = async () => {
     if (!name || !email || !password) {
-      Alert.alert('Please fill in all fields');
+      await showAlert('Error', 'Please fill in all fields');
       return;
     }
     setLoading(true);
