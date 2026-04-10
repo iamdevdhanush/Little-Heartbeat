@@ -1,0 +1,264 @@
+/* Little Heartbeat - Web App Styles */
+
+/* CSS Variables for safe area insets */
+:root {
+  --sat: env(safe-area-inset-top, 0px);
+  --sar: env(safe-area-inset-right, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  --sal: env(safe-area-inset-left, 0px);
+  
+  /* Brand Colors */
+  --primary: #E8517A;
+  --primary-light: #F2829E;
+  --primary-dark: #C73D65;
+  --accent: #7B9FD4;
+  --background: #FFF8FA;
+  --surface: #FFFFFF;
+  --text-primary: #2D1B2E;
+  --text-secondary: #6B4C6E;
+  --text-muted: #B09AB3;
+  --risk-low: #4CAF87;
+  --risk-medium: #F5A623;
+  --risk-high: #E53935;
+}
+
+/* Reset & Base */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+  background-color: var(--background);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overscroll-behavior: none;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Prevent pull-to-refresh */
+body {
+  overscroll-behavior-y: contain;
+}
+
+/* App Container */
+#root {
+  height: 100%;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Mobile App Frame (optional - for demo) */
+.app-frame {
+  max-width: 430px;
+  margin: 0 auto;
+  height: 100%;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  box-shadow: 0 0 60px rgba(232, 81, 122, 0.15);
+  overflow: hidden;
+}
+
+@media (min-width: 768px) {
+  .app-frame {
+    margin-top: 20px;
+    margin-bottom: 20px;
+    height: calc(100% - 40px);
+    border-radius: 40px;
+    border: 8px solid #1a1a1a;
+  }
+}
+
+/* Hide scrollbar but keep scrolling */
+::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  background: transparent;
+}
+
+/* Focus styles */
+:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+/* Button reset for web */
+button {
+  font-family: inherit;
+  cursor: pointer;
+  border: none;
+  background: none;
+  padding: 0;
+  margin: 0;
+}
+
+/* Input reset for web */
+input, textarea {
+  font-family: inherit;
+  font-size: inherit;
+}
+
+/* Image defaults */
+img {
+  max-width: 100%;
+  height: auto;
+}
+
+/* Loading state */
+.app-loading {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #FFE4EE 0%, #E8F4FF 100%);
+  z-index: 9999;
+}
+
+.app-loading .heart {
+  font-size: 80px;
+  animation: heartbeat 1s ease-in-out infinite;
+}
+
+@keyframes heartbeat {
+  0%, 100% { transform: scale(1); }
+  25% { transform: scale(1.1); }
+  50% { transform: scale(1); }
+  75% { transform: scale(1.05); }
+}
+
+.app-loading .title {
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--primary);
+  margin-top: 16px;
+  letter-spacing: -0.5px;
+}
+
+.app-loading .subtitle {
+  font-size: 16px;
+  color: var(--text-muted);
+  margin-top: 8px;
+}
+
+/* Pulse animation */
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.pulse {
+  animation: pulse 2s ease-in-out infinite;
+}
+
+/* Slide up animation */
+@keyframes slideUp {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.slide-up {
+  animation: slideUp 0.3s ease-out;
+}
+
+/* Fade in animation */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.fade-in {
+  animation: fadeIn 0.2s ease-out;
+}
+
+/* Safe area padding for web */
+.safe-area-top {
+  padding-top: var(--sat);
+}
+
+.safe-area-bottom {
+  padding-bottom: var(--sab);
+}
+
+/* Web-specific utility classes */
+.web-only {
+  display: none;
+}
+
+@media (Platform.OS === 'web') {
+  .web-only {
+    display: block;
+  }
+  
+  .mobile-only {
+    display: none;
+  }
+}
+
+/* Desktop mode - center app */
+@media (min-width: 1024px) {
+  body {
+    background: linear-gradient(135deg, #FFE4EE 0%, #E8F4FF 50%, #FFF0F5 100%);
+  }
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Print styles (hide app) */
+@media print {
+  .app-frame {
+    display: none;
+  }
+}
+
+/* Selection color */
+::selection {
+  background-color: rgba(232, 81, 122, 0.2);
+  color: var(--primary-dark);
+}
+
+/* Custom scrollbar (for web) */
+@media (hover: hover) {
+  ::-webkit-scrollbar {
+    width: 6px;
+  }
+  
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  
+  ::-webkit-scrollbar-thumb {
+    background: rgba(232, 81, 122, 0.3);
+    border-radius: 3px;
+  }
+  
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(232, 81, 122, 0.5);
+  }
+}
