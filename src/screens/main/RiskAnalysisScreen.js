@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   StyleSheet, Text, View, ScrollView, TouchableOpacity,
-  KeyboardAvoidingView, Platform,
+  KeyboardAvoidingView, Platform, Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -46,12 +46,27 @@ export default function RiskAnalysisScreen({ navigation }) {
 
   const handleAnalyze = async () => {
     setLoading(true);
-    await new Promise(r => setTimeout(r, 1500));
-    const analysis = analyzeHealthForm({
-      systolic, diastolic, sugarFasting,
-      symptoms: selectedSymptoms,
-    });
-    setResult(analysis);
+    try {
+      const analysis = await analyzeHealthForm({
+        systolic, diastolic, sugarFasting,
+        symptoms: selectedSymptoms,
+      });
+      setResult(analysis);
+      
+      if (analysis.risk === 'High') {
+        Alert.alert(
+          '🚨 High Risk Detected',
+          'Your symptoms indicate you should seek immediate medical attention.',
+          [
+            { text: 'View Emergency Help', onPress: () => navigation.navigate('Emergency') },
+            { text: 'I\'ll Monitor', style: 'cancel' },
+          ]
+        );
+      }
+    } catch (error) {
+      console.error('Analysis error:', error);
+      Alert.alert('Error', 'Unable to analyze your health data. Please try again.');
+    }
     setLoading(false);
   };
 

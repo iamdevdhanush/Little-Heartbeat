@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
   StyleSheet, Text, View, ScrollView, TextInput,
-  TouchableOpacity, KeyboardAvoidingView, Platform, ActivityIndicator,
+  TouchableOpacity, KeyboardAvoidingView, Platform, ActivityIndicator, Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -53,20 +53,43 @@ export default function ChatScreen() {
     setIsTyping(true);
     scrollToBottom();
 
-    await new Promise(r => setTimeout(r, 1200 + Math.random() * 800));
+    try {
+      const response = await generateChatResponse(msgText, profile, language);
+      
+      const botMsg = {
+        id: (Date.now() + 1).toString(),
+        role: 'bot',
+        text: response.text,
+        time: new Date(),
+        isAnalysis: response.isAnalysis || response.requiresEmergency,
+        analysisData: response,
+      };
 
-    const response = generateChatResponse(msgText, profile, language);
-    const botMsg = {
-      id: (Date.now() + 1).toString(),
-      role: 'bot',
-      text: response.text,
-      time: new Date(),
-      isAnalysis: response.isAnalysis,
-      analysisData: response.analysisData,
-    };
+      setIsTyping(false);
+      setMessages(prev => [...prev, botMsg]);
 
-    setIsTyping(false);
-    setMessages(prev => [...prev, botMsg]);
+      if (response.requiresEmergency) {
+        Alert.alert(
+          '⚠️ High Risk Detected',
+          'Based on your symptoms, we recommend seeking immediate medical attention. Would you like to access emergency help?',
+          [
+            { text: 'I\'m Okay', style: 'cancel' },
+            { text: 'Get Emergency Help', onPress: () => navigation.navigate('Emergency') },
+          ]
+        );
+      }
+    } catch (error) {
+      console.error('Chat error:', error);
+      setIsTyping(false);
+      const errorMsg = {
+        id: (Date.now() + 1).toString(),
+        role: 'bot',
+        text: 'I\'m sorry, I had trouble processing that. Please try again or contact your doctor directly. 💕',
+        time: new Date(),
+        isAnalysis: false,
+      };
+      setMessages(prev => [...prev, errorMsg]);
+    }
   };
 
   const formatTime = (date) => {

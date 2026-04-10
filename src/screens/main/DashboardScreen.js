@@ -153,17 +153,25 @@ export default function DashboardScreen({ navigation }) {
 
           {/* Quick Actions */}
           <View style={styles.quickActions}>
-            <TouchableOpacity style={[styles.quickBtn, { backgroundColor: '#FFF0F5' }]} onPress={() => navigation.navigate('Chat')}>
-              <Text style={styles.quickBtnEmoji}>🤖</Text>
-              <Text style={styles.quickBtnText}>Ask AI</Text>
-            </TouchableOpacity>
+            {(profile?.pregnancyMonth || 5) >= 7 && (
+              <TouchableOpacity style={[styles.quickBtn, { backgroundColor: '#FFF0F5' }]} onPress={() => navigation.navigate('ContractionTimer')}>
+                <Text style={styles.quickBtnEmoji}>⏱️</Text>
+                <Text style={styles.quickBtnText}>Contractions</Text>
+              </TouchableOpacity>
+            )}
+            {(profile?.pregnancyMonth || 5) < 7 && (
+              <TouchableOpacity style={[styles.quickBtn, { backgroundColor: '#FFF0F5' }]} onPress={() => navigation.navigate('Heartbeat')}>
+                <Text style={styles.quickBtnEmoji}>💗</Text>
+                <Text style={styles.quickBtnText}>Heartbeat</Text>
+              </TouchableOpacity>
+            )}
             <TouchableOpacity style={[styles.quickBtn, { backgroundColor: '#EEF4FF' }]} onPress={() => navigation.navigate('RiskAnalysis')}>
               <Text style={styles.quickBtnEmoji}>📊</Text>
               <Text style={styles.quickBtnText}>Health Check</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.quickBtn, { backgroundColor: '#FFF8EA' }]} onPress={() => navigation.navigate('Emergency')}>
-              <Text style={styles.quickBtnEmoji}>🚨</Text>
-              <Text style={styles.quickBtnText}>Emergency</Text>
+            <TouchableOpacity style={[styles.quickBtn, { backgroundColor: '#FFF8EA' }]} onPress={() => navigation.navigate('HospitalFinder')}>
+              <Text style={styles.quickBtnEmoji}>🏥</Text>
+              <Text style={styles.quickBtnText}>Hospitals</Text>
             </TouchableOpacity>
           </View>
 

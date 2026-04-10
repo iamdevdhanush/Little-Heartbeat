@@ -151,7 +151,29 @@ export default function ProfileScreen({ navigation }) {
         {/* Settings */}
         <View style={[styles.card, shadows.sm]}>
           <Text style={styles.cardTitle}>⚙️ Settings</Text>
-          <View style={styles.settingRow}>
+          <TouchableOpacity 
+            style={styles.settingRow}
+            onPress={() => navigation.navigate('NotificationSettings')}
+          >
+            <View style={styles.settingLeft}>
+              <Text style={styles.settingLabel}>🔔 Notifications</Text>
+              <Text style={styles.settingValue}>Manage reminders and alerts</Text>
+            </View>
+            <Text style={styles.chevron}>→</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={[styles.settingRow, { borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 12, marginTop: 8 }]}
+            onPress={() => navigation.navigate('FamilyDashboard')}
+          >
+            <View style={styles.settingLeft}>
+              <Text style={styles.settingLabel}>👨‍👩‍👧 Family Dashboard</Text>
+              <Text style={styles.settingValue}>Share with partner or family</Text>
+            </View>
+            <Text style={styles.chevron}>→</Text>
+          </TouchableOpacity>
+          
+          <View style={[styles.settingRow, { borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 12, marginTop: 8 }]}>
             <View style={styles.settingLeft}>
               <Text style={styles.settingLabel}>Language</Text>
               <Text style={styles.settingValue}>{language === 'en' ? '🇬🇧 English' : '🇮🇳 हिंदी'}</Text>

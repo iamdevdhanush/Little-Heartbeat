@@ -13,6 +13,12 @@ import DashboardScreen from '../screens/main/DashboardScreen';
 import ChatScreen from '../screens/main/ChatScreen';
 import RiskAnalysisScreen from '../screens/main/RiskAnalysisScreen';
 import EmergencyScreen from '../screens/main/EmergencyScreen';
+import EmergencyContactsScreen from '../screens/main/EmergencyContactsScreen';
+import HospitalFinderScreen from '../screens/main/HospitalFinderScreen';
+import HeartbeatScreen from '../screens/main/HeartbeatScreen';
+import ContractionTimerScreen from '../screens/main/ContractionTimerScreen';
+import NotificationSettingsScreen from '../screens/main/NotificationSettingsScreen';
+import FamilyDashboardScreen from '../screens/main/FamilyDashboardScreen';
 import ProfileScreen from '../screens/main/ProfileScreen';
 
 const Stack = createNativeStackNavigator();
@@ -70,6 +76,12 @@ export default function AppNavigator() {
         <Stack.Screen name="Signup" component={SignupScreen} />
         <Stack.Screen name="ProfileSetup" component={ProfileSetupScreen} />
         <Stack.Screen name="MainTabs" component={MainTabs} />
+        <Stack.Screen name="EmergencyContacts" component={EmergencyContactsScreen} />
+        <Stack.Screen name="HospitalFinder" component={HospitalFinderScreen} />
+        <Stack.Screen name="Heartbeat" component={HeartbeatScreen} />
+        <Stack.Screen name="ContractionTimer" component={ContractionTimerScreen} />
+        <Stack.Screen name="NotificationSettings" component={NotificationSettingsScreen} />
+        <Stack.Screen name="FamilyDashboard" component={FamilyDashboardScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );

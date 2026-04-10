@@ -1,38 +1,72 @@
-// AI Service — Mock + API-ready architecture
-// Replace the mock logic with real Anthropic/OpenAI API calls when ready
+import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from '@google/generative-ai';
 
-const SYMPTOM_RISK_MAP = {
-  'severe headache': { risk: 'High', weight: 3 },
-  'blurred vision': { risk: 'High', weight: 3 },
-  'chest pain': { risk: 'High', weight: 3 },
-  'sudden swelling': { risk: 'High', weight: 3 },
-  'no fetal movement': { risk: 'High', weight: 3 },
-  'heavy bleeding': { risk: 'High', weight: 3 },
-  'high bp': { risk: 'High', weight: 3 },
-  'severe abdominal pain': { risk: 'High', weight: 3 },
-  'fainting': { risk: 'High', weight: 3 },
-  'mild headache': { risk: 'Medium', weight: 2 },
-  'nausea': { risk: 'Low', weight: 1 },
-  'vomiting': { risk: 'Medium', weight: 2 },
-  'backache': { risk: 'Low', weight: 1 },
-  'fatigue': { risk: 'Low', weight: 1 },
-  'swollen feet': { risk: 'Low', weight: 1 },
-  'heartburn': { risk: 'Low', weight: 1 },
-  'light spotting': { risk: 'Medium', weight: 2 },
-  'cramps': { risk: 'Medium', weight: 2 },
-  'difficulty breathing': { risk: 'High', weight: 3 },
-  'fever': { risk: 'Medium', weight: 2 },
-  'dizziness': { risk: 'Medium', weight: 2 },
+const GEMINI_API_KEY = process.env.EXPO_PUBLIC_GEMINI_API_KEY || '';
+
+const genAI = GEMINI_API_KEY ? new GoogleGenerativeAI(GEMINI_API_KEY) : null;
+
+const SAFETY_SETTINGS = [
+  { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
+  { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
+  { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
+  { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
+];
+
+const createMedicalPrompt = (userMessage, profile, analysisType = 'symptoms') => {
+  const month = profile?.pregnancyMonth || 5;
+  const name = profile?.name || 'Mama';
+  const age = profile?.age || 'unknown';
+  const region = profile?.region || 'General';
+
+  return `
+You are Little Heartbeat, a caring AI pregnancy assistant. A pregnant woman named ${name}, ${age} years old, in her ${month}th month of pregnancy from ${region} is asking for help.
+
+IMPORTANT MEDICAL DISCLAIMER: You are NOT a doctor. Always recommend consulting healthcare professionals for medical advice.
+
+User's message: "${userMessage}"
+
+Respond in JSON format with these exact fields:
+{
+  "risk": "High" or "Medium" or "Low",
+  "emoji": "🚨" for High, "⚠️" for Medium, "✅" for Low,
+  "reason": "Brief explanation of why this risk level",
+  "steps": ["Actionable step 1", "Action step 2", "Action step 3"],
+  "isAnalysis": true or false,
+  "requiresEmergency": true if risk is High, false otherwise,
+  "confidence": "High" or "Medium" or "Low",
+  "message": "Reassuring message for the mother"
+}
+
+Guidelines:
+- If symptoms suggest: severe headache, blurred vision, chest pain, difficulty breathing, heavy bleeding, sudden swelling, no fetal movement, fainting → HIGH risk
+- If symptoms are: mild nausea, fatigue, mild swelling, heartburn → LOW risk
+- If symptoms are concerning but not severe → MEDIUM risk
+- Always be gentle, supportive, and reassuring
+- Use culturally appropriate advice for Indian context
+- ${analysisType === 'symptoms' ? 'Analyze the symptoms described' : 'Provide general guidance'}
+`;
 };
 
-const RESPONSES = {
+const parseAIResponse = (text) => {
+  try {
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      return JSON.parse(jsonMatch[0]);
+    }
+    return null;
+  } catch (e) {
+    console.error('Error parsing AI response:', e);
+    return null;
+  }
+};
+
+const FALLBACK_RESPONSES = {
   High: {
     risk: 'High',
     emoji: '🚨',
+    requiresEmergency: true,
     reasons: [
       'Some of your symptoms need immediate medical attention.',
-      'Your blood pressure reading is quite high, which needs urgent care.',
-      'These symptoms together are a serious warning sign.',
+      'Your symptoms could indicate a serious condition that needs urgent care.',
     ],
     steps: [
       'Go to the nearest hospital right away',
@@ -46,10 +80,10 @@ const RESPONSES = {
   Medium: {
     risk: 'Medium',
     emoji: '⚠️',
+    requiresEmergency: false,
     reasons: [
       'Your symptoms need attention from your doctor soon.',
       'This is not an emergency, but you should not ignore it.',
-      'Your reading is slightly outside the normal range.',
     ],
     steps: [
       'Call your doctor today to share these symptoms',
@@ -63,10 +97,10 @@ const RESPONSES = {
   Low: {
     risk: 'Low',
     emoji: '✅',
+    requiresEmergency: false,
     reasons: [
       'What you are experiencing sounds normal for pregnancy.',
       'These are common symptoms many mamas go through.',
-      'Your readings look good!',
     ],
     steps: [
       'Rest and drink plenty of water',
@@ -79,57 +113,180 @@ const RESPONSES = {
   },
 };
 
-// Analyze text symptoms from chat
-export const analyzeSymptoms = (text, profile) => {
-  const lowerText = text.toLowerCase();
-  let maxWeight = 0;
-  let detectedSymptoms = [];
-
-  for (const [symptom, data] of Object.entries(SYMPTOM_RISK_MAP)) {
-    if (lowerText.includes(symptom.split(' ')[0]) || lowerText.includes(symptom)) {
-      detectedSymptoms.push(symptom);
-      if (data.weight > maxWeight) {
-        maxWeight = data.weight;
+const getFallbackResponse = (userMessage, profile) => {
+  const lowerMsg = userMessage.toLowerCase();
+  let maxRisk = 'Low';
+  
+  const highRiskKeywords = ['severe headache', 'blurred vision', 'chest pain', 'difficulty breathing', 'heavy bleeding', 'swelling', 'no movement', 'fainting', 'can\'t breathe'];
+  const medRiskKeywords = ['headache', 'nausea', 'vomiting', 'cramping', 'spotting', 'dizzy', 'pain'];
+  
+  for (const keyword of highRiskKeywords) {
+    if (lowerMsg.includes(keyword)) {
+      maxRisk = 'High';
+      break;
+    }
+  }
+  
+  if (maxRisk === 'Low') {
+    for (const keyword of medRiskKeywords) {
+      if (lowerMsg.includes(keyword)) {
+        maxRisk = 'Medium';
+        break;
       }
     }
   }
-
-  // Check for BP in text
-  const bpMatch = lowerText.match(/(\d{2,3})\s*\/\s*(\d{2,3})/);
-  if (bpMatch) {
-    const systolic = parseInt(bpMatch[1]);
-    if (systolic >= 160) {
-      maxWeight = 3;
-      detectedSymptoms.push('high bp');
-    } else if (systolic >= 140) {
-      maxWeight = Math.max(maxWeight, 2);
-    }
-  }
-
-  const riskLevel = maxWeight >= 3 ? 'High' : maxWeight >= 2 ? 'Medium' : 'Low';
-  const responseTemplate = RESPONSES[riskLevel];
-  const reasonIndex = Math.floor(Math.random() * responseTemplate.reasons.length);
-
+  
+  const response = FALLBACK_RESPONSES[maxRisk];
+  const reasonIndex = Math.floor(Math.random() * response.reasons.length);
+  
   return {
-    risk: riskLevel,
-    emoji: responseTemplate.emoji,
-    reason: responseTemplate.reasons[reasonIndex],
-    steps: responseTemplate.steps,
-    confidence: responseTemplate.confidence,
-    message: responseTemplate.message,
-    detectedSymptoms,
+    ...response,
+    reason: response.reasons[reasonIndex],
+    isAnalysis: true,
   };
 };
 
-// Full health form analysis
-export const analyzeHealthForm = (formData) => {
-  const { systolic, diastolic, sugarFasting, symptoms = [] } = formData;
+export const generateChatResponse = async (userMessage, profile, language = 'en') => {
+  const prompt = createMedicalPrompt(userMessage, profile, 'symptoms');
+  
+  if (!genAI) {
+    console.log('No Gemini API key - using fallback response');
+    return {
+      text: formatFallbackToText(getFallbackResponse(userMessage, profile), profile),
+      ...getFallbackResponse(userMessage, profile),
+    };
+  }
+  
+  try {
+    const model = genAI.getGenerativeModel({ 
+      model: 'gemini-1.5-flash',
+      safetySettings: SAFETY_SETTINGS,
+    });
+    
+    const result = await model.generateContent(prompt);
+    const response = result.response;
+    const text = response.text();
+    
+    const parsed = parseAIResponse(text);
+    
+    if (parsed) {
+      return {
+        text: formatToText(parsed, profile),
+        ...parsed,
+      };
+    }
+    
+    return {
+      text: formatFallbackToText(getFallbackResponse(userMessage, profile), profile),
+      ...getFallbackResponse(userMessage, profile),
+    };
+  } catch (error) {
+    console.error('Gemini API error:', error);
+    const fallback = getFallbackResponse(userMessage, profile);
+    return {
+      text: formatFallbackToText(fallback, profile),
+      ...fallback,
+    };
+  }
+};
 
+const formatToText = (parsed, profile) => {
+  const name = profile?.name || 'Mama';
+  
+  let text = `Thank you for telling me how you feel, ${name}. 💕\n\n`;
+  text += `${parsed.emoji} **Risk Level: ${parsed.risk}**\n\n`;
+  text += `**What this means:** ${parsed.reason}\n\n`;
+  
+  if (parsed.steps && parsed.steps.length > 0) {
+    text += `**What you should do:**\n`;
+    parsed.steps.forEach((step, i) => {
+      text += `${i + 1}. ${step}\n`;
+    });
+  }
+  
+  text += `\n${parsed.message}`;
+  
+  return text;
+};
+
+const formatFallbackToText = (fallback, profile) => {
+  const name = profile?.name || 'Mama';
+  
+  let text = `Thank you for telling me how you feel, ${name}. 💕\n\n`;
+  text += `${fallback.emoji} **Risk Level: ${fallback.risk}**\n\n`;
+  text += `**What this means:** ${fallback.reason}\n\n`;
+  text += `**What you should do:**\n`;
+  fallback.steps.forEach((step, i) => {
+    text += `${i + 1}. ${step}\n`;
+  });
+  text += `\n${fallback.message}`;
+  
+  return text;
+};
+
+export const analyzeHealthForm = async (formData) => {
+  const { systolic, diastolic, sugarFasting, symptoms = [] } = formData;
+  
+  const prompt = `
+You are Little Heartbeat's health analysis AI. Analyze this pregnant woman's health data:
+
+Health Data:
+- Blood Pressure: ${systolic || 'Not provided'}/${diastolic || 'Not provided'} mmHg
+- Fasting Blood Sugar: ${sugarFasting || 'Not provided'} mg/dL
+- Symptoms: ${symptoms.length > 0 ? symptoms.join(', ') : 'None reported'}
+
+Respond in JSON format:
+{
+  "risk": "High" or "Medium" or "Low",
+  "emoji": "🚨" or "⚠️" or "✅",
+  "reasons": ["Reason 1", "Reason 2"],
+  "steps": ["Step 1", "Step 2", "Step 3"],
+  "confidence": "High" or "Medium" or "Low",
+  "overallMessage": "Reassuring message"
+}
+`;
+  
+  if (!genAI) {
+    return analyzeFormFallback(formData);
+  }
+  
+  try {
+    const model = genAI.getGenerativeModel({ 
+      model: 'gemini-1.5-flash',
+      safetySettings: SAFETY_SETTINGS,
+    });
+    
+    const result = await model.generateContent(prompt);
+    const response = result.response;
+    const text = response.text();
+    
+    const parsed = parseAIResponse(text);
+    
+    if (parsed) {
+      return {
+        risk: parsed.risk || 'Low',
+        emoji: parsed.emoji || '✅',
+        reasons: parsed.reasons || ['Everything looks normal'],
+        steps: parsed.steps || ['Continue normal activities'],
+        confidence: parsed.confidence || 'Medium',
+        overallMessage: parsed.overallMessage || 'You are doing great!',
+      };
+    }
+    
+    return analyzeFormFallback(formData);
+  } catch (error) {
+    console.error('Gemini form analysis error:', error);
+    return analyzeFormFallback(formData);
+  }
+};
+
+const analyzeFormFallback = (formData) => {
+  const { systolic, diastolic, sugarFasting, symptoms = [] } = formData;
+  
   let score = 0;
   let reasons = [];
   let steps = [];
-
-  // BP Analysis
+  
   if (systolic && diastolic) {
     const sys = parseInt(systolic);
     const dia = parseInt(diastolic);
@@ -142,27 +299,23 @@ export const analyzeHealthForm = (formData) => {
       reasons.push('Your blood pressure is a little high. This needs monitoring.');
       steps.push('Call your doctor today to discuss your blood pressure.');
       steps.push('Reduce salt in your food.');
-      steps.push('Rest and avoid stress.');
-    } else if (sys >= 120 && sys < 140) {
+    } else if (sys >= 120) {
       score += 1;
       reasons.push('Your blood pressure is slightly elevated. Keep watching it.');
     } else {
       reasons.push('Your blood pressure looks normal. Well done!');
     }
   }
-
-  // Sugar Analysis
+  
   if (sugarFasting) {
     const sugar = parseInt(sugarFasting);
     if (sugar >= 200) {
       score += 3;
-      reasons.push('Your blood sugar is very high. This needs immediate medical attention.');
-      steps.push('See your doctor today about gestational diabetes management.');
+      reasons.push('Your blood sugar is very high. This needs immediate attention.');
     } else if (sugar >= 126) {
       score += 2;
       reasons.push('Your fasting sugar is above normal. This may indicate gestational diabetes.');
       steps.push('Speak to your doctor about a glucose tolerance test.');
-      steps.push('Reduce sugar and refined carbohydrates in your diet.');
     } else if (sugar >= 95) {
       score += 1;
       reasons.push('Your blood sugar is slightly above normal. Worth monitoring.');
@@ -170,20 +323,18 @@ export const analyzeHealthForm = (formData) => {
       reasons.push('Your blood sugar level looks healthy!');
     }
   }
-
-  // Symptoms
-  const highRiskSymptoms = symptoms.filter(s =>
-    ['severe_headache', 'blurred_vision', 'chest_pain', 'no_movement', 'heavy_bleeding', 'fainting'].includes(s)
-  );
-  const medRiskSymptoms = symptoms.filter(s =>
-    ['mild_headache', 'vomiting', 'spotting', 'severe_cramps', 'difficulty_breathing', 'fever'].includes(s)
-  );
-
-  if (highRiskSymptoms.length > 0) {
+  
+  const highRiskSymptoms = ['severe_headache', 'blurred_vision', 'chest_pain', 'no_movement', 'fainting', 'difficulty_breathing'];
+  const medRiskSymptoms = ['mild_headache', 'vomiting', 'spotting', 'severe_cramps', 'fever'];
+  
+  const highCount = symptoms.filter(s => highRiskSymptoms.includes(s)).length;
+  const medCount = symptoms.filter(s => medRiskSymptoms.includes(s)).length;
+  
+  if (highCount > 0) {
     score += 3;
     reasons.push('You have symptoms that need urgent attention today.');
     steps.push('Please go to the hospital immediately.');
-  } else if (medRiskSymptoms.length > 1) {
+  } else if (medCount > 1) {
     score += 2;
     reasons.push('You have some symptoms that your doctor should know about.');
     steps.push('Contact your doctor or midwife today.');
@@ -191,8 +342,7 @@ export const analyzeHealthForm = (formData) => {
     score += 1;
     reasons.push('Some mild symptoms noted. These are often normal in pregnancy.');
   }
-
-  // Add general steps if none added
+  
   if (steps.length === 0) {
     steps = [
       'Continue your regular prenatal check-ups',
@@ -201,92 +351,79 @@ export const analyzeHealthForm = (formData) => {
       'Rest when your body asks for it',
     ];
   }
-
+  
   const riskLevel = score >= 5 ? 'High' : score >= 2 ? 'Medium' : 'Low';
-
+  const emojis = { High: '🚨', Medium: '⚠️', Low: '✅' };
+  const messages = {
+    High: 'Please do not wait. Your health and your baby\'s health are the top priority. Go to the hospital now. 🏥',
+    Medium: 'Please take care of yourself and reach out to your doctor. I am here for you. 💕',
+    Low: 'You are doing great! Keep following your doctor\'s advice and taking care of yourself. 🌸',
+  };
+  
   return {
     risk: riskLevel,
-    emoji: RESPONSES[riskLevel].emoji,
+    emoji: emojis[riskLevel],
     reasons: reasons.filter(Boolean),
     steps: [...new Set(steps)],
     confidence: score >= 4 ? 'High' : score >= 2 ? 'Medium' : 'High',
-    overallMessage: RESPONSES[riskLevel].message,
+    overallMessage: messages[riskLevel],
   };
 };
 
-// Generate conversational AI response
-export const generateChatResponse = (userMessage, profile, language = 'en') => {
-  const analysis = analyzeSymptoms(userMessage, profile);
-  const lowerMsg = userMessage.toLowerCase();
+export const generateDailyInsight = async (profile) => {
+  const month = profile?.pregnancyMonth || 5;
+  const name = profile?.name || 'Mama';
+  
+  const prompt = `
+You are Little Heartbeat, a caring AI pregnancy assistant. Generate a personalized daily insight for ${name}, who is in her ${month}th month of pregnancy.
 
-  // Greeting responses
-  if (lowerMsg.includes('hello') || lowerMsg.includes('hi') || lowerMsg.includes('hey')) {
-    return {
-      text: `Hello ${profile?.name || 'dear'}! 💕 I am so happy you are here. How are you feeling today? You can tell me about any symptoms, worries, or just chat about your pregnancy journey.`,
-      isAnalysis: false,
-    };
+Respond in JSON format:
+{
+  "insight": "Today's health tip or encouragement",
+  "tip": "One actionable advice for today",
+  "emoji": "Relevant emoji",
+  "category": "nutrition" or "exercise" or "emotional" or "medical"
+}
+`;
+  
+  if (!genAI) {
+    return getDefaultInsight(month);
   }
-
-  // Diet questions
-  if (lowerMsg.includes('eat') || lowerMsg.includes('food') || lowerMsg.includes('diet') || lowerMsg.includes('nutrition')) {
-    return {
-      text: `Great question about nutrition! 🥗\n\nDuring pregnancy, focus on:\n• Plenty of leafy greens for iron and folate\n• Lentils and beans for protein\n• Dairy for calcium\n• Fresh fruits for vitamins\n• Lots of water — 8 glasses a day!\n\nAvoid raw papaya, alcohol, and high-mercury fish. Check your Diet Guide in the Home screen for region-specific advice. 🌸`,
-      isAnalysis: false,
-    };
+  
+  try {
+    const model = genAI.getGenerativeModel({ 
+      model: 'gemini-1.5-flash',
+      safetySettings: SAFETY_SETTINGS,
+    });
+    
+    const result = await model.generateContent(prompt);
+    const text = result.response.text();
+    const parsed = parseAIResponse(text);
+    
+    if (parsed) {
+      return {
+        insight: parsed.insight || 'Take care of yourself today!',
+        tip: parsed.tip || 'Rest and stay hydrated.',
+        emoji: parsed.emoji || '💕',
+        category: parsed.category || 'general',
+      };
+    }
+    
+    return getDefaultInsight(month);
+  } catch (error) {
+    console.error('Gemini insight error:', error);
+    return getDefaultInsight(month);
   }
+};
 
-  // Exercise questions
-  if (lowerMsg.includes('exercise') || lowerMsg.includes('walk') || lowerMsg.includes('yoga') || lowerMsg.includes('workout')) {
-    const month = profile?.pregnancyMonth || 5;
-    const exerciseAdvice = month <= 3
-      ? 'Short 10-15 minute walks are perfect. Avoid anything strenuous.'
-      : month <= 6
-      ? '30-minute daily walks and gentle prenatal yoga are wonderful!'
-      : 'Light walking and pelvic floor exercises. Avoid lying on your back.';
-
-    return {
-      text: `Exercise during pregnancy is so beneficial! 🏃‍♀️\n\nFor month ${month}:\n${exerciseAdvice}\n\n✅ Safe: Walking, swimming, prenatal yoga\n❌ Avoid: Contact sports, heavy lifting, hot yoga\n\nAlways listen to your body. If you feel any discomfort, stop and rest.`,
-      isAnalysis: false,
-    };
-  }
-
-  // Sleep questions
-  if (lowerMsg.includes('sleep') || lowerMsg.includes('rest') || lowerMsg.includes('tired') || lowerMsg.includes('fatigue')) {
-    return {
-      text: `Feeling tired is completely normal! Your body is doing incredible work. 😴\n\n💡 Tips for better sleep:\n• Sleep on your left side — it\'s best for baby\n• Use a pregnancy pillow between your knees\n• Keep the room cool and dark\n• Avoid screens 30 minutes before bed\n• Short naps of 20 minutes are helpful\n\nYou deserve all the rest, mama! 🌸`,
-      isAnalysis: false,
-    };
-  }
-
-  // Generic worry
-  if (lowerMsg.includes('worried') || lowerMsg.includes('scared') || lowerMsg.includes('anxious') || lowerMsg.includes('afraid')) {
-    return {
-      text: `It is completely okay to feel worried during pregnancy. Your feelings are valid. 💕\n\nHere are some things that help:\n• Talk to your doctor about your concerns\n• Deep breathing for 5 minutes helps calm the mind\n• Connect with other pregnant mamas\n• Write down your worries to clear your mind\n\nYou are not alone. I am here whenever you need to talk. 🌸`,
-      isAnalysis: false,
-    };
-  }
-
-  // Symptom analysis for everything else
-  const response = analysis;
-
-  let text = '';
-  if (response.detectedSymptoms.length === 0) {
-    text = `Thank you for sharing that with me. 💕\n\nBased on what you told me, everything seems okay. But I always recommend talking to your doctor if something feels different or worrying.\n\nIs there anything specific you would like to know more about? I am here to help! 🌸`;
-    return { text, isAnalysis: false };
-  }
-
-  text = `Thank you for telling me how you feel. Let me help you understand this better.\n\n`;
-  text += `${response.emoji} **Risk Level: ${response.risk}**\n\n`;
-  text += `**What this means:** ${response.reason}\n\n`;
-  text += `**What you should do:**\n`;
-  response.steps.forEach((step, i) => {
-    text += `${i + 1}. ${step}\n`;
-  });
-  text += `\n${response.message}`;
-
-  return {
-    text,
-    isAnalysis: true,
-    analysisData: response,
-  };
+const getDefaultInsight = (month) => {
+  const insights = [
+    { insight: 'Stay hydrated today! Aim for 8-10 glasses of water.', tip: 'Keep a water bottle nearby and sip throughout the day.', emoji: '💧', category: 'nutrition' },
+    { insight: 'Light walking is great for you and baby!', tip: 'Try a 20-minute walk after meals.', emoji: '🚶‍♀️', category: 'exercise' },
+    { insight: 'Remember to take your prenatal vitamins!', tip: 'Take them with food to avoid nausea.', emoji: '💊', category: 'medical' },
+    { insight: 'Your baby can hear your voice now!', tip: 'Talk or sing to your baby - they love your voice.', emoji: '🎵', category: 'emotional' },
+    { insight: 'Rest is important - listen to your body.', tip: 'Take short breaks throughout the day.', emoji: '😴', category: 'emotional' },
+  ];
+  
+  return insights[month % insights.length];
 };
