@@ -9,5 +9,9 @@ npm-debug.log
 expo-env.d.ts
 # @end expo-cli
 .vercel
-
-.vercel
+_expo/
+app.css
+sw.js
+manifest.json
+metadata.json
+favicon.ico
