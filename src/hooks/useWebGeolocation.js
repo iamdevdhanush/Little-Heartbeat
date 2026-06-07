@@ -1,7 +1,5 @@
+// useWebGeolocation.js — Pure browser Geolocation API
 import { useState, useEffect, useCallback } from 'react';
-import { Platform } from 'react-native';
-
-const isWeb = Platform.OS === 'web';
 
 export const useWebGeolocation = (options = {}) => {
   const [location, setLocation] = useState(null);
@@ -11,86 +9,61 @@ export const useWebGeolocation = (options = {}) => {
 
   const getCurrentPosition = useCallback(() => {
     return new Promise((resolve, reject) => {
-      if (isWeb) {
-        if (!navigator.geolocation) {
-          setError('Geolocation is not supported');
-          reject(new Error('Geolocation is not supported'));
-          return;
-        }
-
-        navigator.geolocation.getCurrentPosition(
-          (position) => {
-            const locationData = {
-              latitude: position.coords.latitude,
-              longitude: position.coords.longitude,
-              accuracy: position.coords.accuracy,
-              altitude: position.coords.altitude,
-              timestamp: position.timestamp,
-            };
-            setLocation(locationData);
-            resolve(locationData);
-          },
-          (err) => {
-            setError(err.message);
-            reject(err);
-          },
-          {
-            enableHighAccuracy: true,
-            timeout: 10000,
-            maximumAge: 0,
-            ...options,
-          }
-        );
-      } else {
-        getNativeLocation().then(resolve).catch(reject);
+      if (!navigator.geolocation) {
+        const err = new Error('Geolocation is not supported');
+        setError(err.message);
+        reject(err);
+        return;
       }
-    });
-  }, [options]);
-
-  const requestPermission = useCallback(async () => {
-    if (isWeb) {
-      try {
-        const result = await new Promise((resolve) => {
-          navigator.permissions.query({ name: 'geolocation' }).then((permResult) => {
-            setPermission(permResult.state);
-            resolve(permResult.state);
-          }).catch(() => {
-            setPermission('granted');
-            resolve('granted');
-          });
-        });
-        return result;
-      } catch (e) {
-        setPermission('granted');
-        return 'granted';
-      }
-    }
-    return 'granted';
-  }, []);
-
-  const watchPosition = useCallback((onSuccess, onError) => {
-    if (isWeb) {
-      const watchId = navigator.geolocation.watchPosition(
+      navigator.geolocation.getCurrentPosition(
         (position) => {
           const locationData = {
             latitude: position.coords.latitude,
             longitude: position.coords.longitude,
             accuracy: position.coords.accuracy,
+            altitude: position.coords.altitude,
             timestamp: position.timestamp,
           };
           setLocation(locationData);
-          if (onSuccess) onSuccess(locationData);
+          resolve(locationData);
         },
         (err) => {
           setError(err.message);
-          if (onError) onError(err);
+          reject(err);
         },
-        options
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0, ...options }
       );
+    });
+  }, [options]);
 
-      return () => navigator.geolocation.clearWatch(watchId);
+  const requestPermission = useCallback(async () => {
+    try {
+      const result = await navigator.permissions.query({ name: 'geolocation' });
+      setPermission(result.state);
+      result.addEventListener('change', () => setPermission(result.state));
+      return result.state;
+    } catch {
+      return 'granted';
     }
-    return () => {};
+  }, []);
+
+  const watchPosition = useCallback((onSuccess, onError) => {
+    if (!navigator.geolocation) return () => {};
+    const watchId = navigator.geolocation.watchPosition(
+      (position) => {
+        const locationData = {
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+          accuracy: position.coords.accuracy,
+          timestamp: position.timestamp,
+        };
+        setLocation(locationData);
+        if (onSuccess) onSuccess(locationData);
+      },
+      (err) => { setError(err.message); if (onError) onError(err); },
+      options
+    );
+    return () => navigator.geolocation.clearWatch(watchId);
   }, [options]);
 
   useEffect(() => {
@@ -102,37 +75,7 @@ export const useWebGeolocation = (options = {}) => {
     init();
   }, []);
 
-  return {
-    location,
-    error,
-    loading,
-    permission,
-    getCurrentPosition,
-    requestPermission,
-    watchPosition,
-    isWeb,
-  };
-};
-
-const getNativeLocation = async () => {
-  try {
-    const expoLocation = require('expo-location');
-    const hasPermission = await expoLocation.requestForegroundPermissionsAsync();
-    if (hasPermission.status !== 'granted') {
-      throw new Error('Permission denied');
-    }
-    const position = await expoLocation.getCurrentPositionAsync({
-      accuracy: expoLocation.Accuracy.High,
-    });
-    return {
-      latitude: position.coords.latitude,
-      longitude: position.coords.longitude,
-      accuracy: position.coords.accuracy,
-      timestamp: position.timestamp,
-    };
-  } catch (e) {
-    throw e;
-  }
+  return { location, error, loading, permission, getCurrentPosition, requestPermission, watchPosition, isWeb: true };
 };
 
 export default useWebGeolocation;

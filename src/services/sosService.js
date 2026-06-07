@@ -1,69 +1,60 @@
-import * as Location from 'expo-location';
-import * as SMS from 'expo-sms';
-import * as Contacts from 'expo-contacts';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+// sosService.js — Pure Web implementation
+// Replaces expo-location, expo-sms, expo-contacts, AsyncStorage
 
 const EMERGENCY_CONTACTS_KEY = '@lh_emergency_contacts';
 
+// ── Location ──────────────────────────────────────────
+
 export const requestLocationPermission = async () => {
-  const { status } = await Location.requestForegroundPermissionsAsync();
-  return status === 'granted';
-};
-
-export const getCurrentLocation = async () => {
+  if (!navigator.geolocation) return false;
   try {
-    const hasPermission = await requestLocationPermission();
-    if (!hasPermission) {
-      return null;
-    }
-
-    const location = await Location.getCurrentPositionAsync({
-      accuracy: Location.Accuracy.High,
-    });
-
-    return {
-      latitude: location.coords.latitude,
-      longitude: location.coords.longitude,
-      accuracy: location.coords.accuracy,
-      timestamp: location.timestamp,
-    };
-  } catch (error) {
-    console.error('Error getting location:', error);
-    return null;
+    const result = await navigator.permissions.query({ name: 'geolocation' });
+    return result.state !== 'denied';
+  } catch {
+    return true; // Browser may not support permissions API — try anyway
   }
 };
 
-export const getLocationAddress = async (latitude, longitude) => {
-  try {
-    const [address] = await Location.reverseGeocodeAsync({
-      latitude,
-      longitude,
-    });
-
-    if (address) {
-      const parts = [
-        address.streetNumber,
-        address.street,
-        address.district,
-        address.city,
-        address.region,
-      ].filter(Boolean);
-      return parts.join(', ') || 'Unknown location';
+export const getCurrentLocation = () => {
+  return new Promise((resolve) => {
+    if (!navigator.geolocation) {
+      resolve(getDefaultLocation());
+      return;
     }
-    return 'Unknown location';
-  } catch (error) {
-    console.error('Error getting address:', error);
-    return 'Unknown location';
-  }
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        resolve({
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+          accuracy: position.coords.accuracy,
+          timestamp: position.timestamp,
+        });
+      },
+      (error) => {
+        console.warn('Geolocation error:', error.message);
+        resolve(getDefaultLocation());
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+  });
 };
 
-export const getGoogleMapsLink = (latitude, longitude) => {
-  return `https://maps.google.com/?q=${latitude},${longitude}`;
-};
+const getDefaultLocation = () => ({
+  latitude: 28.6139,
+  longitude: 77.2090,
+  accuracy: 1000,
+  timestamp: Date.now(),
+  isDefault: true,
+});
+
+export const getGoogleMapsLink = (latitude, longitude) =>
+  `https://maps.google.com/?q=${latitude},${longitude}`;
+
+// ── Contacts Storage (localStorage) ───────────────────
 
 export const saveEmergencyContacts = async (contacts) => {
   try {
-    await AsyncStorage.setItem(EMERGENCY_CONTACTS_KEY, JSON.stringify(contacts));
+    localStorage.setItem(EMERGENCY_CONTACTS_KEY, JSON.stringify(contacts));
     return true;
   } catch (error) {
     console.error('Error saving emergency contacts:', error);
@@ -73,7 +64,7 @@ export const saveEmergencyContacts = async (contacts) => {
 
 export const getEmergencyContacts = async () => {
   try {
-    const data = await AsyncStorage.getItem(EMERGENCY_CONTACTS_KEY);
+    const data = localStorage.getItem(EMERGENCY_CONTACTS_KEY);
     return data ? JSON.parse(data) : [];
   } catch (error) {
     console.error('Error getting emergency contacts:', error);
@@ -81,102 +72,54 @@ export const getEmergencyContacts = async () => {
   }
 };
 
-export const getDeviceContacts = async () => {
-  try {
-    const { status } = await Contacts.requestPermissionsAsync();
-    if (status !== 'granted') {
-      return [];
-    }
+// No device contacts on web — returns empty (manual entry only)
+export const getDeviceContacts = async () => [];
 
-    const { data } = await Contacts.getContactsAsync({
-      fields: [Contacts.Fields.PhoneNumbers, Contacts.Fields.Name],
-      pageSize: 100,
-    });
+// ── SOS / Messaging ───────────────────────────────────
 
-    return data
-      .filter(contact => contact.phoneNumbers && contact.phoneNumbers.length > 0)
-      .map(contact => ({
-        id: contact.id,
-        name: contact.name,
-        phone: contact.phoneNumbers[0].number,
-      }));
-  } catch (error) {
-    console.error('Error getting device contacts:', error);
-    return [];
-  }
-};
-
+/**
+ * Sends emergency message via WhatsApp deep link.
+ * Web cannot send SMS directly — opens WhatsApp with pre-filled message.
+ */
 export const sendEmergencySMS = async (profile, riskLevel = 'High', additionalMessage = '') => {
   try {
-    const isAvailable = await SMS.isAvailableAsync();
-    if (!isAvailable) {
-      return { success: false, error: 'SMS not available on this device' };
-    }
-
     const location = await getCurrentLocation();
     const contacts = await getEmergencyContacts();
-
-    if (contacts.length === 0) {
-      return { success: false, error: 'No emergency contacts configured' };
-    }
-
-    const mapsLink = location 
-      ? getGoogleMapsLink(location.latitude, location.longitude)
-      : '';
-
+    const mapsLink = getGoogleMapsLink(location.latitude, location.longitude);
     const name = profile?.name || 'A pregnant woman';
     const month = profile?.pregnancyMonth || 'unknown';
-    
+
     let message = `🚨 EMERGENCY: ${name} (${month} months pregnant) needs help!\n\n`;
-    
-    if (riskLevel === 'High') {
-      message += `⚠️ HIGH RISK: Seeking immediate medical attention.\n\n`;
-    }
-    
-    if (location) {
-      message += `📍 Location: ${mapsLink}\n`;
-      message += `🗺️ Google Maps: ${mapsLink}\n\n`;
+    if (riskLevel === 'High') message += `⚠️ HIGH RISK: Seeking immediate medical attention.\n\n`;
+    if (!location.isDefault) {
+      message += `📍 Location: ${mapsLink}\n\n`;
     } else {
       message += `📍 Location could not be determined.\n\n`;
     }
-    
-    if (additionalMessage) {
-      message += `Note: ${additionalMessage}\n\n`;
-    }
-    
-    message += `Please help immediately or call emergency services.`;
+    if (additionalMessage) message += `Note: ${additionalMessage}\n\n`;
+    message += `Please help immediately or call emergency services (108).`;
 
-    const phoneNumbers = contacts.map(c => c.phone);
-
-    const { result } = await SMS.sendSMSAsync(phoneNumbers, message);
+    // Open WhatsApp with message (user selects contact in WhatsApp)
+    const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(message)}`;
+    window.open(whatsappUrl, '_blank', 'noopener,noreferrer');
 
     return {
-      success: result === 'sent' || result === 'unknown',
-      result,
-      location,
+      success: true,
+      isWebMode: true,
       message,
+      mapsLink,
+      location,
+      contactsNotified: contacts.length,
     };
   } catch (error) {
-    console.error('Error sending emergency SMS:', error);
+    console.error('Error sending emergency message:', error);
     return { success: false, error: error.message };
   }
 };
 
-export const sendCustomSMS = async (phoneNumbers, message) => {
-  try {
-    const isAvailable = await SMS.isAvailableAsync();
-    if (!isAvailable) {
-      return { success: false, error: 'SMS not available' };
-    }
-
-    const { result } = await SMS.sendSMSAsync(phoneNumbers, message);
-    return { success: result === 'sent' || result === 'unknown', result };
-  } catch (error) {
-    console.error('Error sending SMS:', error);
-    return { success: false, error: error.message };
-  }
-};
-
+/**
+ * Main SOS trigger — vibrates + opens WhatsApp emergency message
+ */
 export const triggerSOS = async (profile, options = {}) => {
   const {
     riskLevel = 'High',
@@ -186,31 +129,24 @@ export const triggerSOS = async (profile, options = {}) => {
   } = options;
 
   try {
-    if (vibrationPattern) {
-      const Haptics = await import('expo-haptics');
-      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+    // Browser vibration API
+    if (vibrationPattern && navigator.vibrate) {
+      navigator.vibrate([500, 200, 500, 200, 500]);
     }
 
     const location = includeLocation ? await getCurrentLocation() : null;
-
     const contacts = await getEmergencyContacts();
-    
-    let result;
-    if (contacts.length > 0) {
-      result = await sendEmergencySMS(profile, riskLevel, customMessage);
-    }
+    const result = await sendEmergencySMS(profile, riskLevel, customMessage);
 
     return {
       success: true,
       location,
       contactsNotified: contacts.length,
       smsResult: result,
+      isWebMode: true,
     };
   } catch (error) {
     console.error('SOS Error:', error);
-    return {
-      success: false,
-      error: error.message,
-    };
+    return { success: false, error: error.message };
   }
 };

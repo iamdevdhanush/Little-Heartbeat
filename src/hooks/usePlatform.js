@@ -1,40 +1,35 @@
-import { useState, useEffect, createContext, useContext } from 'react';
-import { Platform, useWindowDimensions } from 'react-native';
-
-const isWeb = Platform.OS === 'web';
-const isMobile = Platform.OS === 'ios' || Platform.OS === 'android';
+// usePlatform.js — Pure web platform detection
+import { useState, useEffect } from 'react';
 
 export const usePlatform = () => {
-  const { width, height } = useWindowDimensions();
-  const [isOnline, setIsOnline] = useState(true);
-  const [isStandalone, setIsStandalone] = useState(false);
+  const [width, setWidth] = useState(window.innerWidth);
+  const [height, setHeight] = useState(window.innerHeight);
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [isStandalone, setIsStandalone] = useState(
+    window.matchMedia('(display-mode: standalone)').matches
+  );
 
   useEffect(() => {
-    if (isWeb) {
-      setIsOnline(navigator.onLine);
+    const handleResize = () => { setWidth(window.innerWidth); setHeight(window.innerHeight); };
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
 
-      const handleOnline = () => setIsOnline(true);
-      const handleOffline = () => setIsOnline(false);
+    window.addEventListener('resize', handleResize);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
 
-      window.addEventListener('online', handleOnline);
-      window.addEventListener('offline', handleOffline);
-
-      if (window.matchMedia('(display-mode: standalone)').matches) {
-        setIsStandalone(true);
-      }
-
-      return () => {
-        window.removeEventListener('online', handleOnline);
-        window.removeEventListener('offline', handleOffline);
-      };
-    }
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
   }, []);
 
   return {
-    isWeb,
-    isMobile,
-    isIOS: Platform.OS === 'ios',
-    isAndroid: Platform.OS === 'android',
+    isWeb: true,
+    isMobile: /iPhone|iPad|Android/i.test(navigator.userAgent),
+    isIOS: /iPhone|iPad/i.test(navigator.userAgent),
+    isAndroid: /Android/i.test(navigator.userAgent),
     isOnline,
     isStandalone,
     isTablet: width >= 768,
@@ -45,60 +40,29 @@ export const usePlatform = () => {
 };
 
 export const useMediaQuery = (query) => {
-  const [matches, setMatches] = useState(false);
+  const [matches, setMatches] = useState(() => window.matchMedia(query).matches);
 
   useEffect(() => {
-    if (isWeb && window.matchMedia) {
-      const mediaQuery = window.matchMedia(query);
-      setMatches(mediaQuery.matches);
-
-      const handler = (e) => setMatches(e.matches);
-      mediaQuery.addEventListener('change', handler);
-
-      return () => mediaQuery.removeEventListener('change', handler);
-    }
+    const mq = window.matchMedia(query);
+    setMatches(mq.matches);
+    const handler = (e) => setMatches(e.matches);
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
   }, [query]);
 
   return matches;
 };
 
 export const useIsLandscape = () => {
-  const { width, height } = useWindowDimensions();
+  const { width, height } = usePlatform();
   return width > height;
 };
 
-export const useSafeAreaInsets = () => {
-  const [insets, setInsets] = useState({ top: 0, bottom: 0, left: 0, right: 0 });
-
-  useEffect(() => {
-    if (isWeb) {
-      const updateInsets = () => {
-        const computedStyle = window.getComputedStyle(document.documentElement);
-        const safeTop = parseInt(computedStyle.getPropertyValue('--sat') || '0', 10);
-        const safeBottom = parseInt(computedStyle.getPropertyValue('--sab') || '0', 10);
-        setInsets({
-          top: safeTop,
-          bottom: safeBottom,
-          left: 0,
-          right: 0,
-        });
-      };
-
-      updateInsets();
-      window.addEventListener('resize', updateInsets);
-      return () => window.removeEventListener('resize', updateInsets);
-    }
-  }, []);
-
-  return insets;
-};
-
-export const PlatformContext = createContext({
-  isWeb: false,
-  isMobile: true,
-  isStandalone: false,
+export const useSafeAreaInsets = () => ({
+  top: parseInt(getComputedStyle(document.documentElement).getPropertyValue('--sat') || '0') || 0,
+  bottom: parseInt(getComputedStyle(document.documentElement).getPropertyValue('--sab') || '0') || 0,
+  left: 0,
+  right: 0,
 });
-
-export const usePlatformContext = () => useContext(PlatformContext);
 
 export default usePlatform;
