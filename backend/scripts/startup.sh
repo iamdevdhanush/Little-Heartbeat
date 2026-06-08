@@ -3,6 +3,9 @@ set -e
 
 cd backend
 
+# Ensure the backend directory is on the Python path
+export PYTHONPATH="${PYTHONPATH}:."
+
 # Run migrations
 alembic upgrade head
 
