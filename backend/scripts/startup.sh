@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -e
 
+cd backend
+
 # Run migrations
 alembic upgrade head
 
