@@ -1,158 +1,288 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useApp } from '../../context/AppContext.js';
-import { triggerSOS, getCurrentLocation, getEmergencyContacts } from '../../services/sosService.js';
-import Alert, { useAlert } from '../../components/common/Alert.jsx';
 
-const EMERGENCY_NUMBERS = [
-  { name: 'Emergency Ambulance', number: '108', emoji: '🚑', color: 'linear-gradient(135deg, #E53935, #C62828)' },
-  { name: 'Police', number: '100', emoji: '👮', color: 'linear-gradient(135deg, #1565C0, #0D47A1)' },
-  { name: 'Women Helpline', number: '181', emoji: '👩', color: 'linear-gradient(135deg, #E8517A, #C73D65)' },
-];
-
-const WARNING_SIGNS = [
-  { emoji: '🩸', text: 'Heavy vaginal bleeding' },
-  { emoji: '🤕', text: 'Severe persistent headache' },
-  { emoji: '👁️', text: 'Blurred vision or seeing spots' },
-  { emoji: '😮‍💨', text: 'Difficulty breathing' },
-  { emoji: '💔', text: 'Chest pain' },
-  { emoji: '🤢', text: "Severe vomiting that won't stop" },
-  { emoji: '🌡️', text: 'Fever above 38.5°C' },
-  { emoji: '👶', text: 'Baby not moving for 2+ hours' },
-  { emoji: '💧', text: 'Water breaks' },
-  { emoji: '😵', text: 'Fainting or dizziness' },
+const emergencyContacts = [
+  {
+    id: 1,
+    name: 'Rahul',
+    relation: 'Husband',
+    avatar: 'R',
+    avatarColor: '#5B5BD6',
+    notifiedAt: '2 min ago',
+    phone: '+91-98765-43210',
+  },
+  {
+    id: 2,
+    name: 'Meera',
+    relation: 'Mother',
+    avatar: 'M',
+    avatarColor: '#7C9AFF',
+    notifiedAt: '2 min ago',
+    phone: '+91-87654-32109',
+  },
 ];
 
 export default function EmergencyPage() {
-  const { profile } = useApp();
-  const navigate = useNavigate();
-  const { alertProps, showAlert } = useAlert();
-  const [sosLoading, setSosLoading] = useState(false);
-  const [sosSent, setSosSent] = useState(false);
-  const [emergencyContacts, setEmergencyContacts] = useState([]);
+  const [alertActive, setAlertActive] = useState(true);
+  const [holdProgress, setHoldProgress] = useState(0);
+  const [isHolding, setIsHolding] = useState(false);
+  const [secondsElapsed, setSecondsElapsed] = useState(0);
 
   useEffect(() => {
-    getEmergencyContacts().then(setEmergencyContacts);
-  }, []);
+    if (!alertActive) return;
+    const timer = setInterval(() => {
+      setSecondsElapsed(s => s + 1);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [alertActive]);
 
-  const handleSOS = async () => {
-    setSosLoading(true);
-    if (navigator.vibrate) navigator.vibrate([500, 200, 500]);
-    try {
-      const result = await triggerSOS(profile, { riskLevel: 'High', includeLocation: true });
-      setSosSent(true);
-      if (result.success) {
-        showAlert('✅ SOS Sent!', 'WhatsApp has been opened with your emergency message and location. Please send it to your contacts.', [{ text: 'OK' }]);
-      }
-    } catch (error) {
-      showAlert('Error', 'Could not send SOS. Try calling emergency services directly.');
-    }
-    setSosLoading(false);
+  const handleCallEmergency = () => {
+    window.location.href = 'tel:112';
   };
 
-  const handleCall = (number, name) => {
-    showAlert(`Call ${name}?`, `You are about to call ${number}`, [
-      { text: 'Cancel', style: 'cancel' },
-      { text: `Call ${number}`, style: 'destructive', onPress: () => window.open(`tel:${number}`) },
-    ]);
+  const handleCallContact = (phone) => {
+    window.location.href = `tel:${phone}`;
   };
+
+  if (!alertActive) {
+    return (
+      <div className="screen" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '80vh', textAlign: 'center' }}>
+        <div style={{ fontSize: 64, marginBottom: 16 }}>✅</div>
+        <h1 style={{ fontSize: 28, fontWeight: 700, color: 'var(--color-text-primary)', marginBottom: 8, letterSpacing: '-0.02em' }}>
+          Alert Cancelled
+        </h1>
+        <p style={{ color: 'var(--color-text-secondary)', fontSize: 16, marginBottom: 32 }}>
+          Your contacts have been notified that you are safe.
+        </p>
+        <button
+          className="btn btn-primary"
+          onClick={() => { setAlertActive(true); setSecondsElapsed(0); }}
+        >
+          Back to SOS
+        </button>
+      </div>
+    );
+  }
 
   return (
-    <div>
-      {/* Header */}
-      <div className="bg-gradient-emergency" style={{ padding: '20px 20px 16px', paddingTop: 'calc(20px + env(safe-area-inset-top,0px))', textAlign: 'center', borderBottom: '1px solid #FFB3B3' }}>
-        <div style={{ width: 64, height: 64, borderRadius: '50%', background: '#FFCDD2', border: '2px solid #EF9A9A', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 32, margin: '0 auto 8px' }}>🚨</div>
-        <h1 style={{ fontSize: 22, fontWeight: 800, color: '#B71C1C' }}>Emergency Help</h1>
-        <p style={{ fontSize: 13, color: '#E57373', marginTop: 2 }}>Stay calm. Help is available.</p>
-      </div>
+    <div style={{ background: '#FFFAF9', minHeight: '100%' }}>
+      <div style={{ padding: '24px 20px', maxWidth: 'var(--max-width)', margin: '0 auto' }}>
 
-      <div className="scroll-area">
-        {/* SOS Button */}
-        <button className={`sos-button ${sosSent ? 'sent' : ''}`} onClick={handleSOS} disabled={sosLoading}>
-          {!sosSent && !sosLoading && <div className="sos-ring" />}
-          {sosLoading ? (
-            <span className="spinner" style={{ width: 48, height: 48, borderWidth: 4 }} />
-          ) : (
-            <>
-              <span className="sos-emoji">{sosSent ? '✅' : '🆘'}</span>
-              <span className="sos-title">{sosSent ? 'SOS SENT!' : 'TAP FOR SOS'}</span>
-              <span className="sos-sub">{sosSent ? 'Your contacts have been notified via WhatsApp' : 'Opens WhatsApp with your location'}</span>
-              {emergencyContacts.length > 0 && !sosSent && (
-                <span className="sos-contacts">Will notify: {emergencyContacts.map(c => c.name).join(', ')}</span>
-              )}
-            </>
-          )}
-        </button>
-
-        {!sosSent && emergencyContacts.length === 0 && (
-          <button onClick={() => navigate('/app/contacts')} style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%', background: '#fff', borderRadius: 'var(--radius-xl)', border: '1px solid var(--color-border)', padding: 16, cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit' }}>
-            <span style={{ fontSize: 32 }}>📱</span>
-            <div className="flex-1">
-              <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--color-text-primary)' }}>Set up Emergency Contacts</div>
-              <div style={{ fontSize: 13, color: 'var(--color-text-muted)', marginTop: 2 }}>Add contacts who will receive your location during an emergency</div>
-            </div>
-            <span style={{ fontSize: 20, color: 'var(--color-primary)', fontWeight: 700 }}>→</span>
-          </button>
-        )}
-
-        {sosSent && (
-          <button onClick={() => setSosSent(false)} style={{ textAlign: 'center', width: '100%', background: '#fff', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-xl)', padding: 12, cursor: 'pointer', fontSize: 14, color: 'var(--color-text-muted)', fontFamily: 'inherit' }}>
-            Tap to send SOS again if needed
-          </button>
-        )}
-
-        {/* Emergency Numbers */}
-        <div>
-          <div className="section-title">📞 Emergency Numbers</div>
-          <p className="section-subtitle">Tap to call immediately</p>
-          {EMERGENCY_NUMBERS.map((c, i) => (
-            <button key={i} onClick={() => handleCall(c.number, c.name)} style={{ width: '100%', background: c.color, borderRadius: 'var(--radius-xl)', padding: 16, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8, boxShadow: 'var(--shadow-md)' }}>
-              <span style={{ fontSize: 28 }}>{c.emoji}</span>
-              <div style={{ flex: 1, textAlign: 'left' }}>
-                <div style={{ fontSize: 14, fontWeight: 700, color: '#fff' }}>{c.name}</div>
-                <div style={{ fontSize: 22, fontWeight: 800, color: '#fff' }}>{c.number}</div>
-              </div>
-              <div style={{ background: 'rgba(255,255,255,0.25)', borderRadius: 'var(--radius-full)', padding: '6px 12px' }}>
-                <span style={{ color: '#fff', fontSize: 13, fontWeight: 700 }}>Call Now →</span>
-              </div>
-            </button>
-          ))}
-        </div>
-
-        {/* Warning Signs */}
-        <div>
-          <div className="section-title">🚨 Go to Hospital if you have:</div>
-          <p className="section-subtitle">Do not wait — these need immediate care</p>
-          <div className="warning-card">
-            {WARNING_SIGNS.map((sign, i) => (
-              <div key={i} className="warning-row">
-                <span className="warning-emoji">{sign.emoji}</span>
-                <span className="warning-text">{sign.text}</span>
-              </div>
-            ))}
+        {/* ── Status Bar ── */}
+        <div className="flex items-center justify-between mb-6 animate-fade-in-up" style={{ paddingTop: 8 }}>
+          <div className="flex items-center gap-2">
+            <div className="sos-pulse" />
+            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-danger)' }}>
+              SOS Active · {Math.floor(secondsElapsed / 60)}:{String(secondsElapsed % 60).padStart(2, '0')}
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--color-success)' }} />
+            <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-success)' }}>Location Shared</span>
           </div>
         </div>
 
-        {/* Calm Card */}
-        <div className="bg-gradient-blue" style={{ borderRadius: 'var(--radius-xl)', padding: 20 }}>
-          <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--color-accent-dark)', marginBottom: 8 }}>💙 Stay Calm, Mama</div>
-          <p style={{ fontSize: 14, color: '#2D4A6E', lineHeight: 1.7 }}>
-            Take slow, deep breaths.<br/>
-            Breathe in for 4 counts, hold for 4, out for 4.<br/><br/>
-            You are strong. Help is on the way.
+        {/* ── Header ── */}
+        <div className="animate-fade-in-up delay-1" style={{ textAlign: 'center', marginBottom: 28 }}>
+          <div style={{
+            width: 72, height: 72, borderRadius: '50%',
+            background: 'var(--color-danger-tint)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            margin: '0 auto 16px',
+            border: '3px solid rgba(255,107,107,0.2)',
+          }}>
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--color-danger)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+            </svg>
+          </div>
+          <h1 style={{ fontSize: 32, fontWeight: 700, color: 'var(--color-text-primary)', marginBottom: 8, letterSpacing: '-0.02em' }}>
+            Emergency Help
+          </h1>
+          <p style={{ fontSize: 15, color: 'var(--color-text-secondary)', lineHeight: 1.6, maxWidth: 280, margin: '0 auto' }}>
+            We've sent your location to your emergency contacts
+          </p>
+          <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginTop: 12 }}>
+            <span className="badge badge-success">✓ Location Shared</span>
+            <span className="badge badge-primary">Contacts Notified</span>
+          </div>
+        </div>
+
+        {/* ── Primary Emergency Call CTA ── */}
+        <button
+          className="animate-fade-in-up delay-2"
+          onClick={handleCallEmergency}
+          style={{
+            width: '100%', padding: '20px 24px', borderRadius: 20,
+            background: 'var(--gradient-danger)',
+            color: 'white', fontSize: 18, fontWeight: 700,
+            border: 'none', cursor: 'pointer',
+            boxShadow: 'var(--shadow-danger)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
+            marginBottom: 8,
+            fontFamily: 'var(--font-family)',
+            transition: 'all var(--transition-fast)',
+            letterSpacing: '-0.01em',
+          }}
+        >
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.61 3.38 2 2 0 0 1 3.6 1.18h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 9a16 16 0 0 0 6 6l1.89-1.89a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
+          </svg>
+          Call Emergency Services (112)
+        </button>
+        <p style={{ textAlign: 'center', fontSize: 12, color: 'var(--color-text-muted)', marginBottom: 24 }}>
+          Your GPS coordinates will be shared automatically
+        </p>
+
+        {/* ── Emergency Contacts ── */}
+        <section className="animate-fade-in-up delay-3" style={{ marginBottom: 20 }}>
+          <h2 style={{ fontSize: 16, fontWeight: 700, color: 'var(--color-text-primary)', marginBottom: 12, letterSpacing: '-0.01em' }}>
+            Your Emergency Contacts
+          </h2>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {emergencyContacts.map((contact) => (
+              <div key={contact.id} className="card" style={{ padding: '14px 16px' }}>
+                <div className="flex items-center gap-3">
+                  {/* Avatar */}
+                  <div style={{
+                    width: 44, height: 44, borderRadius: '50%',
+                    background: contact.avatarColor,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    color: 'white', fontWeight: 700, fontSize: 18, flexShrink: 0,
+                  }}>
+                    {contact.avatar}
+                  </div>
+
+                  {/* Info */}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div className="flex items-center gap-2">
+                      <p style={{ fontSize: 15, fontWeight: 700, color: 'var(--color-text-primary)' }}>
+                        {contact.name}
+                      </p>
+                      <span className="badge badge-outline" style={{ fontSize: 10 }}>{contact.relation}</span>
+                    </div>
+                    <p style={{ fontSize: 12, color: 'var(--color-success)', fontWeight: 600, marginTop: 2 }}>
+                      ✓ Notified {contact.notifiedAt}
+                    </p>
+                  </div>
+
+                  {/* Call button */}
+                  <button
+                    onClick={() => handleCallContact(contact.phone)}
+                    style={{
+                      width: 44, height: 44, borderRadius: '50%',
+                      background: 'var(--color-success)',
+                      border: 'none', cursor: 'pointer',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      boxShadow: '0 4px 12px rgba(47,191,113,0.3)',
+                      flexShrink: 0,
+                    }}
+                  >
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.61 3.38 2 2 0 0 1 3.6 1.18h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 9a16 16 0 0 0 6 6l1.89-1.89a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* ── Medical ID Card ── */}
+        <section className="animate-fade-in-up delay-4" style={{ marginBottom: 24 }}>
+          <div className="card" style={{ padding: 0, overflow: 'hidden', border: '1px solid rgba(255,107,107,0.2)' }}>
+            {/* Card Header */}
+            <div style={{
+              background: '#FFF5F5',
+              padding: '12px 16px',
+              display: 'flex', alignItems: 'center', gap: 8,
+              borderBottom: '1px solid rgba(255,107,107,0.12)',
+            }}>
+              <div style={{
+                width: 28, height: 28, borderRadius: 8,
+                background: 'var(--color-danger-tint)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 14,
+              }}>
+                ⚕️
+              </div>
+              <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-danger-dark)', letterSpacing: '0.02em' }}>
+                MEDICAL INFORMATION
+              </p>
+            </div>
+
+            {/* Card Body */}
+            <div style={{ padding: '16px', background: '#FFFAF9' }}>
+              <div style={{ display: 'flex', gap: 16, marginBottom: 14 }}>
+                <div style={{ flex: 1 }}>
+                  <p style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-muted)', marginBottom: 2 }}>Blood Type</p>
+                  <p style={{ fontSize: 28, fontWeight: 800, color: 'var(--color-text-primary)', letterSpacing: '-0.02em' }}>O−</p>
+                </div>
+                <div style={{ flex: 1 }}>
+                  <p style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-muted)', marginBottom: 2 }}>Weeks Pregnant</p>
+                  <p style={{ fontSize: 28, fontWeight: 800, color: 'var(--color-text-primary)', letterSpacing: '-0.02em' }}>28w</p>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {[
+                  { label: 'Allergies', value: 'Penicillin' },
+                  { label: 'Conditions', value: 'Gestational Diabetes' },
+                  { label: 'OB/GYN', value: 'Dr. Anjali Sharma' },
+                  { label: 'Doctor\'s Phone', value: '+91-98765-43210' },
+                ].map(row => (
+                  <div key={row.label} className="flex items-center justify-between">
+                    <span style={{ fontSize: 13, color: 'var(--color-text-muted)', fontWeight: 600 }}>{row.label}</span>
+                    <span style={{ fontSize: 14, color: 'var(--color-text-primary)', fontWeight: 700 }}>{row.value}</span>
+                  </div>
+                ))}
+              </div>
+
+              <div style={{
+                marginTop: 14, padding: '10px 12px',
+                background: 'rgba(255,107,107,0.06)',
+                borderRadius: 10, textAlign: 'center',
+              }}>
+                <p style={{ fontSize: 11, color: 'var(--color-danger-dark)', fontWeight: 600 }}>
+                  📱 Show this screen to emergency personnel
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* ── Location Status ── */}
+        <div className="animate-fade-in-up delay-5" style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginBottom: 20,
+        }}>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-muted)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
+            <circle cx="12" cy="10" r="3"/>
+          </svg>
+          <p style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>
+            Location tracking active · Updating every 30s
           </p>
         </div>
 
-        {/* Actions */}
-        <button onClick={() => navigate('/app/contacts')} style={{ width: '100%', background: 'none', border: 'none', padding: 12, fontSize: 14, color: 'var(--color-primary)', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
-          ⚙️ Manage Emergency Contacts
+        {/* ── Cancel (secondary, low prominence) ── */}
+        <button
+          onClick={() => setAlertActive(false)}
+          style={{
+            width: '100%',
+            padding: '14px',
+            background: 'transparent',
+            border: 'none',
+            color: 'var(--color-text-secondary)',
+            fontSize: 14,
+            fontWeight: 600,
+            cursor: 'pointer',
+            textAlign: 'center',
+            fontFamily: 'var(--font-family)',
+          }}
+        >
+          Cancel Alert — False Alarm
         </button>
-        <button onClick={() => navigate('/app/hospitals')} style={{ width: '100%', background: 'var(--color-accent)', color: '#fff', border: 'none', borderRadius: 'var(--radius-xl)', padding: 16, fontSize: 16, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
-          🏥 Find Nearby Hospitals
-        </button>
-      </div>
 
-      <Alert {...alertProps} />
+      </div>
     </div>
   );
 }
