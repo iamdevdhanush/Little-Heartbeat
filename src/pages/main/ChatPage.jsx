@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useApp } from '../../context/AppContext.js';
+import { useUser } from '../../hooks/useUser.js';
 import { generateChatResponse } from '../../services/aiService.js';
 import { getTranslation } from '../../data/translations.js';
 import RiskBadge from '../../components/common/RiskBadge.jsx';
@@ -12,7 +12,8 @@ const QUICK_PROMPTS = [
 ];
 
 export default function ChatPage() {
-  const { profile, language } = useApp();
+  const { user: profile } = useUser();
+  const language = 'en';
   const navigate = useNavigate();
   const scrollRef = useRef(null);
   const { alertProps, showAlert } = useAlert();

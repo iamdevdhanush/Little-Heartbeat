@@ -122,11 +122,79 @@ self.addEventListener('push', (event) => {
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
   
-  if (event.action === 'view') {
+  const data = event.notification.data || {};
+  const action = event.action;
+  
+  if (action === 'take' || action === 'snooze' || action === 'skip') {
+    // Forward action to the app via client message
     event.waitUntil(
-      clients.openWindow('/')
+      clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+        for (const client of clientList) {
+          client.postMessage({
+            type: 'notification_action',
+            action,
+            reminderId: data.reminderId,
+            data,
+          });
+          // Focus the client
+          if (client.url && 'focus' in client) {
+            return client.focus();
+          }
+        }
+        // If no client is open, open the app
+        if (clientList.length === 0) {
+          return clients.openWindow(data.url || '/care').then((client) => {
+            // Wait a bit for the page to load before sending
+            setTimeout(() => {
+              client.postMessage({
+                type: 'notification_action',
+                action,
+                reminderId: data.reminderId,
+                data,
+              });
+            }, 1000);
+          });
+        }
+      })
+    );
+    return;
+  }
+  
+  if (action === 'view' || !action) {
+    event.waitUntil(
+      clients.openWindow(data.url || '/')
     );
   }
+});
+
+// Medication reminder push handler
+self.addEventListener('push', (event) => {
+  if (!event.data) return;
+  
+  let data;
+  try {
+    data = event.data.json();
+  } catch {
+    data = { title: event.data.text(), body: '' };
+  }
+  
+  const options = {
+    body: data.body || '',
+    icon: '/icons/icon-192x192.png',
+    badge: '/icons/icon-192x192.png',
+    vibrate: [200, 100, 200],
+    data: data.data || {},
+    requireInteraction: true,
+    actions: [
+      { action: 'take', title: '✓ Taken' },
+      { action: 'snooze', title: '⏰ Snooze 10m' },
+      { action: 'skip', title: '✕ Skip' },
+    ],
+  };
+  
+  event.waitUntil(
+    self.registration.showNotification(data.title || 'Medication Reminder', options)
+  );
 });
 
 // Periodic background sync for health reminders

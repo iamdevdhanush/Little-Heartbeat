@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useApp } from '../../context/AppContext.js';
+import { useUser } from '../../hooks/useUser.js';
 import { analyzeHealthForm } from '../../services/aiService.js';
 import Button from '../../components/common/Button.jsx';
 import Input from '../../components/common/Input.jsx';
@@ -23,13 +23,13 @@ const SYMPTOMS = [
 ];
 
 export default function RiskAnalysisPage() {
-  const { profile } = useApp();
+  const { user } = useUser();
   const navigate = useNavigate();
   const { alertProps, showAlert } = useAlert();
 
-  const [systolic, setSystolic] = useState(profile?.bp?.split('/')[0] || '');
-  const [diastolic, setDiastolic] = useState(profile?.bp?.split('/')[1] || '');
-  const [sugarFasting, setSugarFasting] = useState(profile?.sugar || '');
+  const [systolic, setSystolic] = useState(user?.bp?.split('/')[0] || '');
+  const [diastolic, setDiastolic] = useState(user?.bp?.split('/')[1] || '');
+  const [sugarFasting, setSugarFasting] = useState(user?.sugar || '');
   const [selectedSymptoms, setSelectedSymptoms] = useState([]);
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -64,7 +64,6 @@ export default function RiskAnalysisPage() {
       <div className="scroll-area">
         {!result ? (
           <>
-            {/* BP */}
             <div className="card shadow-sm">
               <div className="section-title">🩺 Blood Pressure</div>
               <p className="section-subtitle">Optional — enter if you have a reading</p>
@@ -83,7 +82,6 @@ export default function RiskAnalysisPage() {
               </div>
             </div>
 
-            {/* Sugar */}
             <div className="card shadow-sm">
               <div className="section-title">🍬 Blood Sugar</div>
               <p className="section-subtitle">Fasting sugar level (optional)</p>
@@ -94,7 +92,6 @@ export default function RiskAnalysisPage() {
               </div>
             </div>
 
-            {/* Symptoms */}
             <div className="card shadow-sm">
               <div className="section-title">🩹 Current Symptoms</div>
               <p className="section-subtitle">Select all that apply today</p>
@@ -112,7 +109,7 @@ export default function RiskAnalysisPage() {
                         border: `1.5px solid ${active ? 'var(--color-primary)' : '#E0E0E0'}`,
                         cursor: 'pointer', fontFamily: 'inherit', fontSize: 12,
                         color: active ? 'var(--color-primary)' : 'var(--color-text-secondary)',
-                        fontWeight: active ? 700 : 500, transition: 'all 0.15s ease'
+                        fontWeight: active ? 700 : 500, transition: 'all 0.15s ease',
                       }}
                     >
                       {s.emoji} {s.label} {active && '✓'}
@@ -130,7 +127,6 @@ export default function RiskAnalysisPage() {
           </>
         ) : (
           <>
-            {/* Result Header */}
             <div style={{ background: riskGradient, borderRadius: 'var(--radius-2xl)', padding: 24, textAlign: 'center', border: '1px solid rgba(0,0,0,0.05)', boxShadow: 'var(--shadow-md)' }}>
               <div style={{ fontSize: 48, marginBottom: 8 }}>{result.emoji}</div>
               <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--color-text-primary)', marginBottom: 12 }}>Your Health Report</div>

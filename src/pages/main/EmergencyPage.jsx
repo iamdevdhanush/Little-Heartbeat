@@ -1,31 +1,41 @@
 import React, { useState, useEffect } from 'react';
+import { useUser } from '../../hooks/useUser.js';
+import { usePregnancy } from '../../hooks/usePregnancy.js';
+import { getEmergencyContacts } from '../../services/sosService.js';
 
-const emergencyContacts = [
-  {
-    id: 1,
-    name: 'Rahul',
-    relation: 'Husband',
-    avatar: 'R',
-    avatarColor: '#5B5BD6',
-    notifiedAt: '2 min ago',
-    phone: '+91-98765-43210',
-  },
-  {
-    id: 2,
-    name: 'Meera',
-    relation: 'Mother',
-    avatar: 'M',
-    avatarColor: '#7C9AFF',
-    notifiedAt: '2 min ago',
-    phone: '+91-87654-32109',
-  },
-];
+function EmptyState({ icon, title, subtitle }) {
+  return (
+    <div style={{
+      textAlign: 'center', padding: '24px 16px',
+      background: 'var(--color-surface-tint)',
+      borderRadius: 'var(--radius-card)',
+      border: '1px dashed var(--color-border-strong)',
+    }}>
+      <div style={{ fontSize: 32, marginBottom: 8 }}>{icon}</div>
+      <p style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text-primary)', marginBottom: 4 }}>{title}</p>
+      <p style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>{subtitle}</p>
+    </div>
+  );
+}
 
 export default function EmergencyPage() {
+  const { user, loading: userLoading } = useUser();
+  const { week, loading: pregLoading } = usePregnancy(user?.id);
+  const [contacts, setContacts] = useState([]);
+  const [contactsLoading, setContactsLoading] = useState(true);
+
   const [alertActive, setAlertActive] = useState(true);
   const [holdProgress, setHoldProgress] = useState(0);
   const [isHolding, setIsHolding] = useState(false);
   const [secondsElapsed, setSecondsElapsed] = useState(0);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    getEmergencyContacts().then(data => {
+      setContacts(data || []);
+      setContactsLoading(false);
+    }).catch(() => setContactsLoading(false));
+  }, [user?.id]);
 
   useEffect(() => {
     if (!alertActive) return;
@@ -53,21 +63,18 @@ export default function EmergencyPage() {
         <p style={{ color: 'var(--color-text-secondary)', fontSize: 16, marginBottom: 32 }}>
           Your contacts have been notified that you are safe.
         </p>
-        <button
-          className="btn btn-primary"
-          onClick={() => { setAlertActive(true); setSecondsElapsed(0); }}
-        >
+        <button className="btn btn-primary" onClick={() => { setAlertActive(true); setSecondsElapsed(0); }}>
           Back to SOS
         </button>
       </div>
     );
   }
 
+  const isLoading = userLoading || pregLoading || contactsLoading;
+
   return (
     <div style={{ background: '#FFFAF9', minHeight: '100%' }}>
       <div style={{ padding: '24px 20px', maxWidth: 'var(--max-width)', margin: '0 auto' }}>
-
-        {/* ── Status Bar ── */}
         <div className="flex items-center justify-between mb-6 animate-fade-in-up" style={{ paddingTop: 8 }}>
           <div className="flex items-center gap-2">
             <div className="sos-pulse" />
@@ -81,7 +88,6 @@ export default function EmergencyPage() {
           </div>
         </div>
 
-        {/* ── Header ── */}
         <div className="animate-fade-in-up delay-1" style={{ textAlign: 'center', marginBottom: 28 }}>
           <div style={{
             width: 72, height: 72, borderRadius: '50%',
@@ -106,7 +112,6 @@ export default function EmergencyPage() {
           </div>
         </div>
 
-        {/* ── Primary Emergency Call CTA ── */}
         <button
           className="animate-fade-in-up delay-2"
           onClick={handleCallEmergency}
@@ -132,76 +137,74 @@ export default function EmergencyPage() {
           Your GPS coordinates will be shared automatically
         </p>
 
-        {/* ── Emergency Contacts ── */}
         <section className="animate-fade-in-up delay-3" style={{ marginBottom: 20 }}>
           <h2 style={{ fontSize: 16, fontWeight: 700, color: 'var(--color-text-primary)', marginBottom: 12, letterSpacing: '-0.01em' }}>
             Your Emergency Contacts
           </h2>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {emergencyContacts.map((contact) => (
-              <div key={contact.id} className="card" style={{ padding: '14px 16px' }}>
-                <div className="flex items-center gap-3">
-                  {/* Avatar */}
-                  <div style={{
-                    width: 44, height: 44, borderRadius: '50%',
-                    background: contact.avatarColor,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    color: 'white', fontWeight: 700, fontSize: 18, flexShrink: 0,
-                  }}>
-                    {contact.avatar}
-                  </div>
-
-                  {/* Info */}
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div className="flex items-center gap-2">
-                      <p style={{ fontSize: 15, fontWeight: 700, color: 'var(--color-text-primary)' }}>
-                        {contact.name}
-                      </p>
-                      <span className="badge badge-outline" style={{ fontSize: 10 }}>{contact.relation}</span>
-                    </div>
-                    <p style={{ fontSize: 12, color: 'var(--color-success)', fontWeight: 600, marginTop: 2 }}>
-                      ✓ Notified {contact.notifiedAt}
-                    </p>
-                  </div>
-
-                  {/* Call button */}
-                  <button
-                    onClick={() => handleCallContact(contact.phone)}
-                    style={{
+          {contacts.length > 0 ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {contacts.map((contact) => (
+                <div key={contact.id} className="card" style={{ padding: '14px 16px' }}>
+                  <div className="flex items-center gap-3">
+                    <div style={{
                       width: 44, height: 44, borderRadius: '50%',
-                      background: 'var(--color-success)',
-                      border: 'none', cursor: 'pointer',
+                      background: contact.avatar_color || '#5B5BD6',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      boxShadow: '0 4px 12px rgba(47,191,113,0.3)',
-                      flexShrink: 0,
-                    }}
-                  >
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.61 3.38 2 2 0 0 1 3.6 1.18h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 9a16 16 0 0 0 6 6l1.89-1.89a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
-                    </svg>
-                  </button>
+                      color: 'white', fontWeight: 700, fontSize: 18, flexShrink: 0,
+                    }}>
+                      {(contact.name || '?').charAt(0).toUpperCase()}
+                    </div>
+
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div className="flex items-center gap-2">
+                        <p style={{ fontSize: 15, fontWeight: 700, color: 'var(--color-text-primary)' }}>
+                          {contact.name}
+                        </p>
+                        {contact.relation && (
+                          <span className="badge badge-outline" style={{ fontSize: 10 }}>{contact.relation}</span>
+                        )}
+                      </div>
+                      <p style={{ fontSize: 12, color: 'var(--color-success)', fontWeight: 600, marginTop: 2 }}>
+                        ✓ Notified
+                      </p>
+                    </div>
+
+                    <button
+                      onClick={() => handleCallContact(contact.phone)}
+                      style={{
+                        width: 44, height: 44, borderRadius: '50%',
+                        background: 'var(--color-success)',
+                        border: 'none', cursor: 'pointer',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        boxShadow: '0 4px 12px rgba(47,191,113,0.3)',
+                        flexShrink: 0,
+                      }}
+                    >
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.61 3.38 2 2 0 0 1 3.6 1.18h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 9a16 16 0 0 0 6 6l1.89-1.89a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
+                      </svg>
+                    </button>
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <EmptyState icon="👥" title="No Emergency Contacts" subtitle="Add emergency contacts in your profile to alert them during an SOS." />
+          )}
         </section>
 
-        {/* ── Medical ID Card ── */}
         <section className="animate-fade-in-up delay-4" style={{ marginBottom: 24 }}>
           <div className="card" style={{ padding: 0, overflow: 'hidden', border: '1px solid rgba(255,107,107,0.2)' }}>
-            {/* Card Header */}
             <div style={{
-              background: '#FFF5F5',
-              padding: '12px 16px',
+              background: '#FFF5F5', padding: '12px 16px',
               display: 'flex', alignItems: 'center', gap: 8,
               borderBottom: '1px solid rgba(255,107,107,0.12)',
             }}>
               <div style={{
                 width: 28, height: 28, borderRadius: 8,
                 background: 'var(--color-danger-tint)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: 14,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14,
               }}>
                 ⚕️
               </div>
@@ -210,32 +213,45 @@ export default function EmergencyPage() {
               </p>
             </div>
 
-            {/* Card Body */}
             <div style={{ padding: '16px', background: '#FFFAF9' }}>
-              <div style={{ display: 'flex', gap: 16, marginBottom: 14 }}>
-                <div style={{ flex: 1 }}>
-                  <p style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-muted)', marginBottom: 2 }}>Blood Type</p>
-                  <p style={{ fontSize: 28, fontWeight: 800, color: 'var(--color-text-primary)', letterSpacing: '-0.02em' }}>O−</p>
-                </div>
-                <div style={{ flex: 1 }}>
-                  <p style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-muted)', marginBottom: 2 }}>Weeks Pregnant</p>
-                  <p style={{ fontSize: 28, fontWeight: 800, color: 'var(--color-text-primary)', letterSpacing: '-0.02em' }}>28w</p>
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {[
-                  { label: 'Allergies', value: 'Penicillin' },
-                  { label: 'Conditions', value: 'Gestational Diabetes' },
-                  { label: 'OB/GYN', value: 'Dr. Anjali Sharma' },
-                  { label: 'Doctor\'s Phone', value: '+91-98765-43210' },
-                ].map(row => (
-                  <div key={row.label} className="flex items-center justify-between">
-                    <span style={{ fontSize: 13, color: 'var(--color-text-muted)', fontWeight: 600 }}>{row.label}</span>
-                    <span style={{ fontSize: 14, color: 'var(--color-text-primary)', fontWeight: 700 }}>{row.value}</span>
+              {isLoading ? (
+                <p style={{ fontSize: 13, color: 'var(--color-text-muted)', textAlign: 'center' }}>Loading medical info...</p>
+              ) : user || week ? (
+                <>
+                  <div style={{ display: 'flex', gap: 16, marginBottom: 14 }}>
+                    <div style={{ flex: 1 }}>
+                      <p style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-muted)', marginBottom: 2 }}>Blood Type</p>
+                      <p style={{ fontSize: 28, fontWeight: 800, color: 'var(--color-text-primary)', letterSpacing: '-0.02em' }}>
+                        {user?.blood_type || '--'}
+                      </p>
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <p style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-muted)', marginBottom: 2 }}>Weeks Pregnant</p>
+                      <p style={{ fontSize: 28, fontWeight: 800, color: 'var(--color-text-primary)', letterSpacing: '-0.02em' }}>
+                        {week ? `${week}w` : '--'}
+                      </p>
+                    </div>
                   </div>
-                ))}
-              </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    {[
+                      { label: 'Allergies', value: user?.allergies || 'None listed' },
+                      { label: 'Conditions', value: user?.conditions || 'None listed' },
+                      { label: 'OB/GYN', value: user?.doctor_name || 'Not set' },
+                      { label: "Doctor's Phone", value: user?.doctor_phone || 'Not set' },
+                    ].map(row => (
+                      <div key={row.label} className="flex items-center justify-between">
+                        <span style={{ fontSize: 13, color: 'var(--color-text-muted)', fontWeight: 600 }}>{row.label}</span>
+                        <span style={{ fontSize: 14, color: 'var(--color-text-primary)', fontWeight: 700 }}>{row.value}</span>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <p style={{ fontSize: 13, color: 'var(--color-text-muted)', textAlign: 'center' }}>
+                  No medical profile found. Complete your profile for emergency use.
+                </p>
+              )}
 
               <div style={{
                 marginTop: 14, padding: '10px 12px',
@@ -250,7 +266,6 @@ export default function EmergencyPage() {
           </div>
         </section>
 
-        {/* ── Location Status ── */}
         <div className="animate-fade-in-up delay-5" style={{
           display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginBottom: 20,
         }}>
@@ -263,25 +278,18 @@ export default function EmergencyPage() {
           </p>
         </div>
 
-        {/* ── Cancel (secondary, low prominence) ── */}
         <button
           onClick={() => setAlertActive(false)}
           style={{
-            width: '100%',
-            padding: '14px',
-            background: 'transparent',
-            border: 'none',
-            color: 'var(--color-text-secondary)',
-            fontSize: 14,
-            fontWeight: 600,
-            cursor: 'pointer',
-            textAlign: 'center',
-            fontFamily: 'var(--font-family)',
+            width: '100%', padding: '14px',
+            background: 'transparent', border: 'none',
+            color: 'var(--color-text-secondary)', fontSize: 14,
+            fontWeight: 600, cursor: 'pointer',
+            textAlign: 'center', fontFamily: 'var(--font-family)',
           }}
         >
           Cancel Alert — False Alarm
         </button>
-
       </div>
     </div>
   );

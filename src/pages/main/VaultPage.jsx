@@ -1,82 +1,63 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useUser } from '../../hooks/useUser.js';
+import databaseService from '../../services/databaseService.js';
+
+function EmptyState({ icon, title, subtitle }) {
+  return (
+    <div style={{
+      textAlign: 'center', padding: '48px 24px',
+      background: 'var(--color-surface-tint)',
+      borderRadius: 'var(--radius-card)',
+      border: '1px dashed var(--color-border-strong)',
+    }}>
+      <div style={{ fontSize: 48, marginBottom: 12 }}>{icon}</div>
+      <p style={{ fontSize: 16, fontWeight: 600, color: 'var(--color-text-primary)', marginBottom: 6 }}>{title}</p>
+      <p style={{ fontSize: 13, color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>{subtitle}</p>
+    </div>
+  );
+}
 
 const filterChips = ['All', 'Prescriptions', 'Lab Reports', 'Scans', 'Medical'];
 
-const documents = [
-  {
-    id: 1,
-    icon: '🧪',
-    iconBg: 'var(--color-primary-tint)',
-    title: 'CBC Blood Report',
-    meta: 'Jun 2, 2026 · Dr. Anjali Sharma · 2.4 MB',
-    tags: ['Blood Test', 'Routine'],
-    category: 'Lab Reports',
-    aiSummary: [
-      { label: 'Hemoglobin', value: '10.2 g/dL', status: 'Low', type: 'danger' },
-      { label: 'Platelets', value: '250,000 /mcL', status: 'Normal', type: 'success' },
-      { label: 'Iron', value: '52 μg/dL', status: 'Borderline', type: 'warning' },
-    ],
-  },
-  {
-    id: 2,
-    icon: '🔬',
-    iconBg: 'var(--color-success-tint)',
-    title: 'Anomaly Scan',
-    meta: 'May 28, 2026 · Sunrise Diagnostics',
-    tags: ['Ultrasound', 'Week 20'],
-    category: 'Scans',
-    aiSummary: [
-      { label: 'Fetal Heart Rate', value: '145 BPM', status: 'Normal', type: 'success' },
-      { label: 'Placenta', value: 'Anterior High', status: 'Note', type: 'primary' },
-      { label: 'Amniotic Fluid', value: 'Normal', status: 'Normal', type: 'success' },
-    ],
-  },
-  {
-    id: 3,
-    icon: '💊',
-    iconBg: '#FFF3E8',
-    title: 'Thyroxine 50mcg',
-    meta: 'May 15, 2026 · Dr. Meena Iyer',
-    tags: ['Prescription', 'Active'],
-    category: 'Prescriptions',
-    statusBadge: { label: 'Currently Taking', type: 'success' },
-  },
-  {
-    id: 4,
-    icon: '📊',
-    iconBg: 'var(--color-warning-tint)',
-    title: 'Glucose Tolerance Test',
-    meta: 'Apr 20, 2026 · City Lab',
-    tags: ['Blood Test', 'GDM Screen'],
-    category: 'Lab Reports',
-    aiSummary: [
-      { label: 'Fasting Glucose', value: '95 mg/dL', status: 'Normal', type: 'success' },
-      { label: '2hr Post-Load', value: '148 mg/dL', status: 'Borderline', type: 'warning' },
-    ],
-  },
-];
-
 export default function VaultPage() {
+  const { user, loading: userLoading } = useUser();
+  const [documents, setDocuments] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [activeFilter, setActiveFilter] = useState('All');
   const [search, setSearch] = useState('');
 
+  useEffect(() => {
+    if (!user?.id) return;
+    databaseService.getDocuments(user.id).then(docs => {
+      setDocuments(docs || []);
+      setLoading(false);
+    });
+  }, [user?.id]);
+
   const filtered = documents.filter(doc => {
     const matchFilter = activeFilter === 'All' || doc.category === activeFilter;
-    const matchSearch = !search || doc.title.toLowerCase().includes(search.toLowerCase());
+    const matchSearch = !search || (doc.title || '').toLowerCase().includes(search.toLowerCase());
     return matchFilter && matchSearch;
   });
 
+  if (userLoading || loading) {
+    return (
+      <div className="screen" style={{ padding: '40px 20px', textAlign: 'center' }}>
+        <div className="sos-pulse" style={{ margin: '0 auto 16px' }} />
+        <p className="text-secondary" style={{ fontSize: 14 }}>Loading your vault...</p>
+      </div>
+    );
+  }
+
   return (
     <div className="screen" style={{ paddingTop: 20 }}>
-
-      {/* ── Header ── */}
       <header className="flex items-center justify-between mb-6 animate-fade-in-up">
         <div>
           <h1 style={{ fontSize: 34, fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--color-text-primary)', lineHeight: 1.1 }}>
             Health Vault
           </h1>
           <p className="small" style={{ marginTop: 4, color: 'var(--color-text-secondary)', display: 'flex', alignItems: 'center', gap: 4 }}>
-            <span>12 documents</span>
+            <span>{documents.length} document{documents.length !== 1 ? 's' : ''}</span>
             <span style={{ opacity: 0.5 }}>·</span>
             <span style={{ color: 'var(--color-success)', fontWeight: 600 }}>🔒 Encrypted</span>
           </p>
@@ -89,15 +70,11 @@ export default function VaultPage() {
         </button>
       </header>
 
-      {/* ── Upload Zone ── */}
       <div className="animate-fade-in-up delay-1" style={{
         border: '2px dashed rgba(91,91,214,0.3)',
         background: 'var(--color-surface-tint)',
-        borderRadius: 'var(--radius-card)',
-        padding: '20px',
-        textAlign: 'center',
-        marginBottom: 20,
-        cursor: 'pointer',
+        borderRadius: 'var(--radius-card)', padding: '20px',
+        textAlign: 'center', marginBottom: 20, cursor: 'pointer',
         transition: 'all var(--transition-normal)',
       }}>
         <div style={{
@@ -133,7 +110,6 @@ export default function VaultPage() {
         </div>
       </div>
 
-      {/* ── Search ── */}
       <div className="animate-fade-in-up delay-1" style={{ marginBottom: 16 }}>
         <div style={{ position: 'relative' }}>
           <div style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-muted)' }}>
@@ -152,7 +128,6 @@ export default function VaultPage() {
         </div>
       </div>
 
-      {/* ── Filter Chips ── */}
       <div className="scroll-x animate-fade-in-up delay-2" style={{ marginBottom: 20 }}>
         {filterChips.map(chip => (
           <button
@@ -163,13 +138,10 @@ export default function VaultPage() {
               borderRadius: 'var(--radius-full)',
               background: activeFilter === chip ? 'var(--color-primary)' : 'white',
               color: activeFilter === chip ? 'white' : 'var(--color-text-secondary)',
-              fontWeight: 600,
-              fontSize: 13,
+              fontWeight: 600, fontSize: 13,
               border: activeFilter === chip ? 'none' : '1.5px solid var(--color-border-medium)',
-              cursor: 'pointer',
-              transition: 'all var(--transition-fast)',
-              fontFamily: 'var(--font-family)',
-              whiteSpace: 'nowrap',
+              cursor: 'pointer', transition: 'all var(--transition-fast)',
+              fontFamily: 'var(--font-family)', whiteSpace: 'nowrap',
               boxShadow: activeFilter === chip ? 'var(--shadow-primary)' : 'none',
             }}
           >
@@ -178,19 +150,30 @@ export default function VaultPage() {
         ))}
       </div>
 
-      {/* ── Documents ── */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-        {filtered.map((doc, i) => (
-          <DocumentCard key={doc.id} doc={doc} animIndex={i} />
-        ))}
-      </div>
-
+      {filtered.length > 0 ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {filtered.map((doc, i) => (
+            <DocumentCard key={doc.id} doc={doc} animIndex={i} />
+          ))}
+        </div>
+      ) : (
+        <EmptyState
+          icon="📂"
+          title={documents.length === 0 ? 'No Documents Yet' : 'No Matching Documents'}
+          subtitle={documents.length === 0
+            ? 'Upload your first prescription, lab report, or scan to get AI-powered health insights.'
+            : 'Try a different filter or search term.'}
+        />
+      )}
     </div>
   );
 }
 
 function DocumentCard({ doc, animIndex }) {
-  const [expanded, setExpanded] = useState(animIndex === 0);
+  const [expanded, setExpanded] = useState(false);
+
+  const aiSummary = doc.ai_summary || doc.aiSummary;
+  const tags = doc.tags || [];
 
   return (
     <div
@@ -198,22 +181,22 @@ function DocumentCard({ doc, animIndex }) {
       style={{ padding: 20, animationDelay: `${animIndex * 0.07}s` }}
       onClick={() => setExpanded(!expanded)}
     >
-      {/* Card Header */}
       <div className="flex items-center gap-3 mb-3">
         <div style={{
           width: 44, height: 44, borderRadius: 12,
-          background: doc.iconBg,
+          background: doc.icon_bg || 'var(--color-primary-tint)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           fontSize: 20, flexShrink: 0,
         }}>
-          {doc.icon}
+          {doc.icon || '📄'}
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <p style={{ fontSize: 15, fontWeight: 700, color: 'var(--color-text-primary)', marginBottom: 2 }}>
             {doc.title}
           </p>
           <p style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>
-            {doc.meta}
+            {doc.uploaded_at ? new Date(doc.uploaded_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : ''}
+            {doc.doctor_name ? ` · ${doc.doctor_name}` : ''}
           </p>
         </div>
         <div style={{ color: 'var(--color-text-muted)', flexShrink: 0, transition: 'transform var(--transition-fast)', transform: expanded ? 'rotate(180deg)' : 'none' }}>
@@ -223,20 +206,16 @@ function DocumentCard({ doc, animIndex }) {
         </div>
       </div>
 
-      {/* Tags */}
       <div className="flex gap-2 flex-wrap mb-3">
-        {doc.tags.map(tag => (
+        {tags.map(tag => (
           <span key={tag} className="badge badge-outline" style={{ fontSize: 11 }}>{tag}</span>
         ))}
-        {doc.statusBadge && (
-          <span className={`badge badge-${doc.statusBadge.type}`} style={{ fontSize: 11 }}>
-            {doc.statusBadge.label}
-          </span>
+        {doc.category && (
+          <span className="badge badge-primary" style={{ fontSize: 11 }}>{doc.category}</span>
         )}
       </div>
 
-      {/* AI Summary (expanded) */}
-      {expanded && doc.aiSummary && (
+      {expanded && aiSummary && (
         <div className="ai-summary" style={{ marginTop: 4 }}>
           <div className="flex items-center gap-2 mb-10" style={{ marginBottom: 10 }}>
             <span style={{ fontSize: 14 }}>✨</span>
@@ -245,37 +224,29 @@ function DocumentCard({ doc, animIndex }) {
             </p>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {doc.aiSummary.map((row, i) => (
+            {(Array.isArray(aiSummary) ? aiSummary : []).map((row, i) => (
               <div key={i} className="flex items-center justify-between">
                 <span style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>{row.label}</span>
                 <div className="flex items-center gap-2">
                   <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)' }}>{row.value}</span>
-                  <span className={`badge badge-${row.type}`} style={{ fontSize: 10 }}>{row.status}</span>
+                  {row.status && (
+                    <span className={`badge badge-${row.type || 'outline'}`} style={{ fontSize: 10 }}>{row.status}</span>
+                  )}
                 </div>
               </div>
             ))}
           </div>
-          <button style={{
-            marginTop: 12, fontSize: 13, fontWeight: 600,
-            color: 'var(--color-primary)', background: 'none',
-            border: 'none', cursor: 'pointer', padding: 0,
-            fontFamily: 'var(--font-family)',
-          }}>
-            View Full Analysis ›
-          </button>
         </div>
       )}
 
-      {/* Actions */}
       {expanded && (
         <div className="flex gap-2 mt-4" onClick={e => e.stopPropagation()}>
-          {['View', 'Share', 'Delete'].map((action, i) => (
+          {['View', 'Share', 'Delete'].map((action) => (
             <button
               key={action}
               style={{
                 flex: action === 'Delete' ? 'none' : 1,
-                padding: '8px 12px',
-                borderRadius: 10,
+                padding: '8px 12px', borderRadius: 10,
                 background: action === 'Delete' ? 'var(--color-danger-tint)' : 'var(--color-surface-tint)',
                 border: '1px solid ' + (action === 'Delete' ? 'rgba(255,107,107,0.2)' : 'var(--color-border)'),
                 color: action === 'Delete' ? 'var(--color-danger)' : 'var(--color-text-primary)',
