@@ -46,23 +46,23 @@ export default function TimelinePage() {
   const isLoading = userLoading || pregLoading || eventsLoading;
 
   if (isLoading) {
-    return (
-      <div className="screen" style={{ padding: '40px 20px', textAlign: 'center' }}>
-        <div className="sos-pulse" style={{ margin: '0 auto 16px' }} />
-        <p className="text-secondary" style={{ fontSize: 14 }}>Loading your journey...</p>
-      </div>
-    );
+  return (
+    <div className="screen" style={{ padding: '40px 20px', textAlign: 'center' }}>
+      <div className="sos-pulse" style={{ margin: '0 auto 16px' }} />
+      <p className="text-secondary caption">Loading your journey...</p>
+    </div>
+  );
   }
 
   return (
     <div className="screen" style={{ paddingTop: 20 }}>
       <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }} className="animate-fade-in-up">
         <div>
-          <h1 style={{ fontSize: 34, fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--color-text-primary)', lineHeight: 1.1 }}>
+          <h1 className="serif-display" style={{ fontSize: 'clamp(32px, 8vw, 48px)' }}>
             Your Journey
           </h1>
           {pregnancy && (
-            <p className="small text-secondary" style={{ marginTop: 4 }}>
+            <p className="body-sm" style={{ color: 'var(--color-text-muted)', marginTop: 4, fontFamily: 'var(--font-serif)', fontStyle: 'italic' }}>
               Week {week} of 40 · {trimester === 1 ? 'First' : trimester === 2 ? 'Second' : 'Third'} Trimester
             </p>
           )}
@@ -120,10 +120,7 @@ export default function TimelinePage() {
             </div>
             <div style={{ flex: 1 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                <span style={{
-                  fontSize: 11, fontWeight: 700, color: 'var(--color-primary)',
-                  letterSpacing: '0.05em', textTransform: 'uppercase',
-                }}>
+                <span className="serif-label" style={{ color: 'var(--color-primary)', fontSize: 12 }}>
                   Week {currentWeek}
                 </span>
                 <span className="badge badge-primary" style={{ fontSize: 10 }}>You are here</span>
@@ -158,10 +155,10 @@ export default function TimelinePage() {
                 </div>
 
                 <div style={{ padding: '16px 20px 20px' }}>
-                  <p style={{ color: 'white', fontSize: 17, fontWeight: 700, marginBottom: 6, letterSpacing: '-0.01em' }}>
+                  <p style={{ color: 'white', fontFamily: 'var(--font-sans)', fontSize: 17, fontWeight: 700, marginBottom: 6, letterSpacing: '-0.01em' }}>
                     {babyGrowth.size_emoji} Your baby is the size of {babyGrowth.size_label}
                   </p>
-                  <p style={{ color: 'rgba(255,255,255,0.8)', fontSize: 14, lineHeight: 1.6, marginBottom: 14 }}>
+                  <p style={{ color: 'rgba(255,255,255,0.8)', fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: 1.6, marginBottom: 14 }}>
                     {babyGrowth.development}
                   </p>
                   {babyGrowth.description && (
@@ -271,11 +268,11 @@ function TimelineEvent({ event, index, currentWeek }) {
               {event.emoji || '📌'}
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <p style={{ fontSize: 15, fontWeight: 700, color: 'var(--color-text-primary)', marginBottom: 2 }}>
+              <p className="sans-title" style={{ fontSize: 15, marginBottom: 2 }}>
                 {event.title}
               </p>
               {event.description && (
-                <p style={{ fontSize: 12, color: 'var(--color-text-secondary)', lineHeight: 1.4 }}>
+                <p className="caption" style={{ color: 'var(--color-text-secondary)' }}>
                   {event.description}
                 </p>
               )}

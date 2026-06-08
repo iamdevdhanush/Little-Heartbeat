@@ -1,7 +1,6 @@
 import React from 'react';
 import { Outlet } from 'react-router-dom';
 import BottomNav from './BottomNav';
-import PwaInstallCard from '../pwa/PwaInstallCard.jsx';
 
 export default function AppLayout() {
   return (
@@ -10,7 +9,6 @@ export default function AppLayout() {
         <Outlet />
       </main>
       <BottomNav />
-      <PwaInstallCard />
     </div>
   );
 }

@@ -41,25 +41,25 @@ export default function VaultPage() {
   });
 
   if (userLoading || loading) {
-    return (
-      <div className="screen" style={{ padding: '40px 20px', textAlign: 'center' }}>
-        <div className="sos-pulse" style={{ margin: '0 auto 16px' }} />
-        <p className="text-secondary" style={{ fontSize: 14 }}>Loading your vault...</p>
-      </div>
-    );
+  return (
+    <div className="screen" style={{ padding: '40px 20px', textAlign: 'center' }}>
+      <div className="sos-pulse" style={{ margin: '0 auto 16px' }} />
+      <p className="text-secondary caption">Loading your vault...</p>
+    </div>
+  );
   }
 
   return (
     <div className="screen" style={{ paddingTop: 20 }}>
       <header className="flex items-center justify-between mb-6 animate-fade-in-up">
         <div>
-          <h1 style={{ fontSize: 34, fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--color-text-primary)', lineHeight: 1.1 }}>
+          <h1 className="serif-display" style={{ fontSize: 'clamp(32px, 8vw, 48px)' }}>
             Health Vault
           </h1>
-          <p className="small" style={{ marginTop: 4, color: 'var(--color-text-secondary)', display: 'flex', alignItems: 'center', gap: 4 }}>
+          <p className="body-sm" style={{ color: 'var(--color-text-muted)', marginTop: 4, display: 'flex', alignItems: 'center', gap: 4, fontFamily: 'var(--font-serif)', fontStyle: 'italic' }}>
             <span>{documents.length} document{documents.length !== 1 ? 's' : ''}</span>
             <span style={{ opacity: 0.5 }}>·</span>
-            <span style={{ color: 'var(--color-success)', fontWeight: 600 }}>🔒 Encrypted</span>
+            <span style={{ color: 'var(--color-success)', fontWeight: 600, fontStyle: 'normal' }}>🔒 Encrypted</span>
           </p>
         </div>
         <button className="btn btn-primary btn-sm" style={{ gap: 6, padding: '10px 16px' }}>
@@ -89,10 +89,10 @@ export default function VaultPage() {
             <path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/>
           </svg>
         </div>
-        <p style={{ fontSize: 15, fontWeight: 700, color: 'var(--color-text-primary)', marginBottom: 4 }}>
+        <p className="sans-title" style={{ fontSize: 16, marginBottom: 4 }}>
           Upload Prescription or Report
         </p>
-        <p style={{ fontSize: 13, color: 'var(--color-text-secondary)', marginBottom: 14 }}>
+        <p className="body-sm" style={{ color: 'var(--color-text-secondary)', marginBottom: 14 }}>
           Tap to scan, photograph or import
         </p>
         <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
@@ -191,10 +191,10 @@ function DocumentCard({ doc, animIndex }) {
           {doc.icon || '📄'}
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <p style={{ fontSize: 15, fontWeight: 700, color: 'var(--color-text-primary)', marginBottom: 2 }}>
+          <p className="sans-title" style={{ fontSize: 15, marginBottom: 2 }}>
             {doc.title}
           </p>
-          <p style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>
+          <p className="caption" style={{ color: 'var(--color-text-secondary)' }}>
             {doc.uploaded_at ? new Date(doc.uploaded_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : ''}
             {doc.doctor_name ? ` · ${doc.doctor_name}` : ''}
           </p>
@@ -219,16 +219,16 @@ function DocumentCard({ doc, animIndex }) {
         <div className="ai-summary" style={{ marginTop: 4 }}>
           <div className="flex items-center gap-2 mb-10" style={{ marginBottom: 10 }}>
             <span style={{ fontSize: 14 }}>✨</span>
-            <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-primary)' }}>
+            <p className="serif-title" style={{ fontSize: 16, color: 'var(--color-primary)' }}>
               AI Summary
             </p>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {(Array.isArray(aiSummary) ? aiSummary : []).map((row, i) => (
               <div key={i} className="flex items-center justify-between">
-                <span style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>{row.label}</span>
+                <span className="caption" style={{ color: 'var(--color-text-secondary)' }}>{row.label}</span>
                 <div className="flex items-center gap-2">
-                  <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)' }}>{row.value}</span>
+                  <span className="body-sm" style={{ fontWeight: 600, color: 'var(--color-text-primary)' }}>{row.value}</span>
                   {row.status && (
                     <span className={`badge badge-${row.type || 'outline'}`} style={{ fontSize: 10 }}>{row.status}</span>
                   )}

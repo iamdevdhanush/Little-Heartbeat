@@ -57,10 +57,10 @@ export default function EmergencyPage() {
     return (
       <div className="screen" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '80vh', textAlign: 'center' }}>
         <div style={{ fontSize: 64, marginBottom: 16 }}>✅</div>
-        <h1 style={{ fontSize: 28, fontWeight: 700, color: 'var(--color-text-primary)', marginBottom: 8, letterSpacing: '-0.02em' }}>
+        <h1 className="serif-heading" style={{ fontSize: 28, marginBottom: 8 }}>
           Alert Cancelled
         </h1>
-        <p style={{ color: 'var(--color-text-secondary)', fontSize: 16, marginBottom: 32 }}>
+        <p className="body-md" style={{ color: 'var(--color-text-secondary)', marginBottom: 32 }}>
           Your contacts have been notified that you are safe.
         </p>
         <button className="btn btn-primary" onClick={() => { setAlertActive(true); setSecondsElapsed(0); }}>
@@ -100,10 +100,10 @@ export default function EmergencyPage() {
               <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
             </svg>
           </div>
-          <h1 style={{ fontSize: 32, fontWeight: 700, color: 'var(--color-text-primary)', marginBottom: 8, letterSpacing: '-0.02em' }}>
+          <h1 className="serif-heading" style={{ fontSize: 32, marginBottom: 8 }}>
             Emergency Help
           </h1>
-          <p style={{ fontSize: 15, color: 'var(--color-text-secondary)', lineHeight: 1.6, maxWidth: 280, margin: '0 auto' }}>
+          <p className="body-md" style={{ color: 'var(--color-text-secondary)', maxWidth: 280, margin: '0 auto' }}>
             We've sent your location to your emergency contacts
           </p>
           <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginTop: 12 }}>
@@ -138,7 +138,7 @@ export default function EmergencyPage() {
         </p>
 
         <section className="animate-fade-in-up delay-3" style={{ marginBottom: 20 }}>
-          <h2 style={{ fontSize: 16, fontWeight: 700, color: 'var(--color-text-primary)', marginBottom: 12, letterSpacing: '-0.01em' }}>
+          <h2 className="sans-title" style={{ fontSize: 18, marginBottom: 12 }}>
             Your Emergency Contacts
           </h2>
 
@@ -158,14 +158,14 @@ export default function EmergencyPage() {
 
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div className="flex items-center gap-2">
-                        <p style={{ fontSize: 15, fontWeight: 700, color: 'var(--color-text-primary)' }}>
+                        <p className="sans-title" style={{ fontSize: 15 }}>
                           {contact.name}
                         </p>
                         {contact.relation && (
                           <span className="badge badge-outline" style={{ fontSize: 10 }}>{contact.relation}</span>
                         )}
                       </div>
-                      <p style={{ fontSize: 12, color: 'var(--color-success)', fontWeight: 600, marginTop: 2 }}>
+                      <p className="caption" style={{ color: 'var(--color-success)', fontWeight: 600, marginTop: 2 }}>
                         ✓ Notified
                       </p>
                     </div>
@@ -208,8 +208,8 @@ export default function EmergencyPage() {
               }}>
                 ⚕️
               </div>
-              <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-danger-dark)', letterSpacing: '0.02em' }}>
-                MEDICAL INFORMATION
+              <p className="serif-label" style={{ color: 'var(--color-danger-dark)', fontSize: 12 }}>
+                Medical Information
               </p>
             </div>
 

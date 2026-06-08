@@ -11,6 +11,10 @@
   <meta name="description" content="Little Heartbeat — Your Pregnancy Operating System. Track your journey, manage medications, and keep your health records safe.">
   <meta name="mobile-web-app-capable" content="yes">
   
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=Geist:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  
   <title>Little Heartbeat — Pregnancy OS</title>
   
   <style>
@@ -22,6 +26,7 @@
       overflow: hidden;
       background-color: #FCFBFF;
       font-family: 'Geist', 'Inter', system-ui, -apple-system, sans-serif;
+      font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
       -webkit-font-smoothing: antialiased;
       -moz-osx-font-smoothing: grayscale;
       touch-action: manipulation;
@@ -45,8 +50,10 @@
     }
     
     .app-loading .title {
-      font-size: 28px; font-weight: 700; color: #2D2338; margin-bottom: 4px;
+      font-family: 'Cormorant Garamond', 'Georgia', serif;
+      font-size: 36px; font-weight: 700; color: #2D2338; margin-bottom: 4px;
       letter-spacing: -0.02em;
+      font-feature-settings: 'lnum', 'pnum';
     }
     
     .app-loading .subtitle { font-size: 14px; color: #6C6278; }

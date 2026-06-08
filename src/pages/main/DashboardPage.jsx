@@ -60,8 +60,16 @@ export default function DashboardPage() {
 
   const userId = user?.id;
 
+  console.log('[Dashboard] mounted, userId:', userId, 'userLoading:', userLoading, 'pregLoading:', pregLoading);
+
   useEffect(() => {
-    if (!userId) return;
+    console.log('[Dashboard] useEffect fired, userId:', userId);
+    if (!userId) {
+      console.log('[Dashboard] no userId, resolving loading');
+      setLoadingData(false);
+      return;
+    }
+    console.log('[Dashboard] fetching data for userId:', userId);
     Promise.all([
       databaseService.getMoodTypes().then(setMoodTypes),
       databaseService.getPregnancyInsight(week).then(setInsight),
@@ -75,7 +83,14 @@ export default function DashboardPage() {
         );
         setTodaysSymptoms(today);
       }),
-    ]).finally(() => setLoadingData(false));
+    ]).then(() => {
+      console.log('[Dashboard] data loaded successfully');
+    }).catch((err) => {
+      console.error('[Dashboard] data loading error:', err);
+    }).finally(() => {
+      console.log('[Dashboard] loading finished');
+      setLoadingData(false);
+    });
   }, [userId, week]);
 
   const logMood = useCallback(async (moodId) => {
@@ -118,12 +133,12 @@ export default function DashboardPage() {
   const isLoading = userLoading || pregLoading || loadingData;
 
   if (isLoading) {
-    return (
-      <div className="screen" style={{ padding: '40px 20px', textAlign: 'center' }}>
-        <div className="sos-pulse" style={{ margin: '0 auto 16px' }} />
-        <p className="text-secondary" style={{ fontSize: 14 }}>Loading your dashboard...</p>
-      </div>
-    );
+  return (
+    <div className="screen" style={{ padding: '40px 20px', textAlign: 'center' }}>
+      <div className="sos-pulse" style={{ margin: '0 auto 16px' }} />
+      <p className="text-secondary caption">Loading your dashboard...</p>
+    </div>
+  );
   }
 
   return (
@@ -149,9 +164,14 @@ export default function DashboardPage() {
         )}
 
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
-          <h1 style={{ fontSize: 32, fontWeight: 700, letterSpacing: '-0.03em', color: 'var(--color-text-primary)', lineHeight: 1.1 }}>
-            {getGreeting()}, {displayName} 🌤️
-          </h1>
+          <div>
+            <h1 className="serif-hero" style={{ fontSize: 'clamp(36px, 10vw, 64px)', marginBottom: 2 }}>
+              {getGreeting()}, {displayName}
+            </h1>
+            <p className="serif-body" style={{ fontSize: 16, color: 'var(--color-text-muted)' }}>
+              {getWeekday()} · Week {week || '--'}
+            </p>
+          </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <div style={{
               width: 44, height: 44, borderRadius: '50%',
@@ -159,6 +179,7 @@ export default function DashboardPage() {
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               color: '#FFFFFF', fontWeight: 700, fontSize: 17,
               boxShadow: '0 4px 16px rgba(91, 91, 214, 0.3)',
+              fontFamily: 'var(--font-sans)',
             }}>
               {initial}
             </div>
@@ -187,10 +208,10 @@ export default function DashboardPage() {
             </div>
 
             <div style={{ flex: 1, minWidth: 0 }}>
-              <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#6C6278' }}>
+              <span className="serif-label">
                 Baby Development
               </span>
-              <h2 style={{ fontSize: 20, fontWeight: 700, color: '#2D2338', marginTop: 4, marginBottom: 8, lineHeight: 1.2, letterSpacing: '-0.02em' }}>
+              <h2 className="serif-title" style={{ color: '#2D2338', marginTop: 4, marginBottom: 8 }}>
                 Your baby is the size of {babyGrowth.size_label} {babyGrowth.size_emoji}
               </h2>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -231,7 +252,7 @@ export default function DashboardPage() {
       {/* ─── Today's Focus ─── */}
       <section style={{ marginBottom: 24 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-          <h3 style={{ fontSize: 20, fontWeight: 700, color: 'var(--color-text-primary)', letterSpacing: '-0.02em' }}>
+          <h3 className="serif-heading" style={{ fontSize: 28 }}>
             Today's Focus
           </h3>
           <span className="badge badge-outline" style={{ fontSize: 11 }}>
@@ -271,10 +292,10 @@ export default function DashboardPage() {
                     </button>
                   </div>
                   <div style={{ marginTop: 8 }}>
-                    <p style={{ fontSize: 14, fontWeight: 700, color: 'var(--color-text-primary)', marginBottom: 2 }}>
+                    <p style={{ fontFamily: 'var(--font-sans)', fontSize: 14, fontWeight: 700, color: 'var(--color-text-primary)', marginBottom: 2 }}>
                       {activeMedications[0].name}
                     </p>
-                    <p style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginBottom: 6 }}>
+                    <p className="caption" style={{ color: 'var(--color-text-secondary)', marginBottom: 6 }}>
                       {activeMedications[0].timing || activeMedications[0].frequency || 'As prescribed'}
                     </p>
                     <span className={`badge ${medsTaken[activeMedications[0].id] ? 'badge-success' : 'badge-warning'}`} style={{ fontSize: 11 }}>
@@ -322,7 +343,7 @@ export default function DashboardPage() {
 
           {/* Mood + Symptoms Card */}
           <div className="card" style={{ padding: 20 }}>
-            <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--color-text-muted)', marginBottom: 12, display: 'block' }}>
+            <span className="serif-label" style={{ marginBottom: 12, display: 'block' }}>
               How do you feel today?
             </span>
             <div style={{ display: 'flex', gap: 8, marginBottom: 18 }}>
@@ -346,7 +367,7 @@ export default function DashboardPage() {
               ))}
             </div>
 
-            <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--color-text-muted)', marginBottom: 10, display: 'block' }}>
+            <span className="serif-label" style={{ marginBottom: 10, display: 'block' }}>
               Log physical symptoms
             </span>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
@@ -377,7 +398,7 @@ export default function DashboardPage() {
       {/* ─── Next Appointment ─── */}
       <section style={{ marginBottom: 24 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-          <h3 style={{ fontSize: 20, fontWeight: 700, color: 'var(--color-text-primary)', letterSpacing: '-0.02em' }}>
+          <h3 className="serif-heading" style={{ fontSize: 28 }}>
             Next Appointment
           </h3>
         </div>
@@ -431,10 +452,10 @@ export default function DashboardPage() {
                 ✨
               </div>
               <div>
-                <p style={{ fontSize: 15, fontWeight: 700, color: 'var(--color-text-primary)' }}>
+                <p className="sans-title" style={{ fontSize: 16 }}>
                   Daily Growth Insight
                 </p>
-                <p style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>
+                <p className="caption" style={{ color: 'var(--color-text-secondary)', marginTop: 2 }}>
                   Week {week} guidance
                 </p>
               </div>
@@ -487,10 +508,10 @@ export default function DashboardPage() {
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
             </svg>
           </div>
-          <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--color-text-primary)', marginBottom: 6 }}>
+          <h3 className="sans-title" style={{ fontSize: 18, marginBottom: 6 }}>
             Upload Medical Report
           </h3>
-          <p style={{ fontSize: 13, color: 'var(--color-text-secondary)', lineHeight: 1.5, maxWidth: 320, margin: '0 auto' }}>
+          <p className="body-sm" style={{ color: 'var(--color-text-secondary)', maxWidth: 320, margin: '0 auto' }}>
             AI extracts medicines, dosage timings, and appointments automatically.
           </p>
           <span className="btn btn-primary btn-sm" style={{ marginTop: 14, display: 'inline-flex' }}>
