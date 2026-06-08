@@ -3,30 +3,25 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <meta name="theme-color" content="#4A3B4D">
+  <meta name="theme-color" content="#FCFBFF">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Little Heartbeat">
   <meta name="application-name" content="Little Heartbeat">
-  <meta name="description" content="AI-powered pregnancy safety companion with real-time emergency alerts">
+  <meta name="description" content="Little Heartbeat — Your Pregnancy Operating System. Track your journey, manage medications, and keep your health records safe.">
   <meta name="mobile-web-app-capable" content="yes">
   
-  <title>Little Heartbeat - Pregnancy Safety Companion</title>
-  <link rel="stylesheet" href="/app.css">
+  <title>Little Heartbeat — Pregnancy OS</title>
   
   <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
     
     html, body {
       height: 100%;
       width: 100%;
       overflow: hidden;
-      background-color: #FBFBFC;
-      font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background-color: #FCFBFF;
+      font-family: 'Geist', 'Inter', system-ui, -apple-system, sans-serif;
       -webkit-font-smoothing: antialiased;
       -moz-osx-font-smoothing: grayscale;
       touch-action: manipulation;
@@ -34,87 +29,56 @@
       user-select: none;
     }
     
-    #root {
-      height: 100%;
-      width: 100%;
-    }
+    #root { height: 100%; width: 100%; display: flex; flex-direction: column; }
     
-    /* Loading screen */
     .app-loading {
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      background: #FBFBFC;
-      z-index: 9999;
+      position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      background: #FCFBFF; z-index: 9999;
     }
     
     .app-loading .icon {
-      font-size: 48px;
-      margin-bottom: 20px;
-      width: 80px;
-      height: 80px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: #F0F1F2;
-      border-radius: 24px;
+      font-size: 48px; margin-bottom: 20px; width: 88px; height: 88px;
+      display: flex; align-items: center; justify-content: center;
+      background: linear-gradient(135deg, #F0EEFF 0%, #F8F5FF 100%);
+      border-radius: 28px; box-shadow: 0 8px 32px rgba(91, 91, 214, 0.12);
     }
     
     .app-loading .title {
-      font-size: 24px;
-      font-weight: 700;
-      color: #4A3B4D;
-      margin-bottom: 6px;
+      font-size: 28px; font-weight: 700; color: #2D2338; margin-bottom: 4px;
+      letter-spacing: -0.02em;
     }
     
-    .app-loading .subtitle {
-      font-size: 14px;
-      color: #7c757b;
-    }
+    .app-loading .subtitle { font-size: 14px; color: #6C6278; }
     
     .app-loading .bar {
-      margin-top: 32px;
-      width: 120px;
-      height: 3px;
-      background: #E8E6E8;
-      border-radius: 2px;
-      overflow: hidden;
+      margin-top: 36px; width: 140px; height: 3px;
+      background: rgba(91, 91, 214, 0.1); border-radius: 99px; overflow: hidden;
     }
     
     .app-loading .bar-inner {
-      height: 100%;
-      width: 30%;
-      background: #5C7CFA;
-      border-radius: 2px;
-      animation: bar 1.2s ease-in-out infinite;
+      height: 100%; width: 35%;
+      background: linear-gradient(90deg, #5B5BD6, #7C9AFF);
+      border-radius: 99px;
+      animation: bar 1.4s ease-in-out infinite;
     }
     
     @keyframes bar {
       0% { transform: translateX(-100%); }
-      100% { transform: translateX(400%); }
+      100% { transform: translateX(385%); }
     }
     
-    /* PWA install prompt */
     .pwa-install-prompt {
-      position: fixed;
-      bottom: 20px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: #fff;
-      padding: 16px 24px;
-      border-radius: 16px;
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      z-index: 10000;
-      animation: slideUp 0.3s ease;
+      position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+      background: rgba(255,255,255,0.95);
+      backdrop-filter: blur(24px) saturate(180%);
+      -webkit-backdrop-filter: blur(24px) saturate(180%);
+      padding: 16px 24px; border-radius: 24px;
+      box-shadow: 0 16px 48px rgba(45, 35, 56, 0.12);
+      display: flex; align-items: center; gap: 14px;
+      z-index: 10000; animation: slideUp 0.4s ease;
+      border: 1px solid rgba(255,255,255,0.8);
+      max-width: calc(100% - 32px);
     }
     
     @keyframes slideUp {
@@ -123,18 +87,13 @@
     }
     
     .pwa-install-prompt button {
-      background: #5C7CFA;
-      color: #fff;
-      border: none;
-      padding: 10px 20px;
-      border-radius: 8px;
-      font-weight: 600;
-      cursor: pointer;
+      background: #5B5BD6; color: #fff; border: none;
+      padding: 10px 20px; border-radius: 14px; font-weight: 600;
+      font-size: 14px; cursor: pointer; font-family: inherit;
     }
     
     .pwa-install-prompt button.dismiss {
-      background: transparent;
-      color: #7c757b;
+      background: transparent; color: #6C6278;
     }
   </style>
 </head>
@@ -143,20 +102,17 @@
     <div class="app-loading">
       <div class="icon">💗</div>
       <div class="title">Little Heartbeat</div>
-      <div class="subtitle">Your pregnancy companion</div>
+      <div class="subtitle">Your Pregnancy OS</div>
       <div class="bar"><div class="bar-inner"></div></div>
     </div>
   </div>
   
   <script>
-    // PWA Install Prompt Handler
     let deferredPrompt;
     
     window.addEventListener('beforeinstallprompt', (e) => {
       e.preventDefault();
       deferredPrompt = e;
-      
-      // Show custom install prompt after 10 seconds
       setTimeout(() => {
         if (deferredPrompt && !localStorage.getItem('pwa_install_dismissed')) {
           showInstallPrompt();
@@ -168,8 +124,8 @@
       const prompt = document.createElement('div');
       prompt.className = 'pwa-install-prompt';
       prompt.innerHTML = `
-        <span>💗</span>
-        <span style="flex:1">Install app for better experience</span>
+        <span style="font-size:24px">💗</span>
+        <span style="flex:1;font-size:14px;font-weight:600;color:#2D2338">Install Little Heartbeat</span>
         <button onclick="installPWA()">Install</button>
         <button class="dismiss" onclick="dismissInstall()">Later</button>
       `;
@@ -196,14 +152,6 @@
       const prompt = document.querySelector('.pwa-install-prompt');
       if (prompt) prompt.remove();
     }
-    
-    
-    // Prevent pull-to-refresh on mobile
-    document.body.addEventListener('touchmove', (e) => {
-      if (e.target === document.body) {
-        e.preventDefault();
-      }
-    }, { passive: false });
   </script>
   <script type="module" src="/src/main.jsx"></script>
 </body>

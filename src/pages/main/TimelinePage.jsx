@@ -93,7 +93,7 @@ export default function TimelinePage() {
     <div className="screen" style={{ paddingTop: 20 }}>
 
       {/* ── Header ── */}
-      <header className="flex items-center justify-between mb-6 animate-fade-in-up">
+      <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }} className="animate-fade-in-up">
         <div>
           <h1 style={{ fontSize: 34, fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--color-text-primary)', lineHeight: 1.1 }}>
             Your Journey
