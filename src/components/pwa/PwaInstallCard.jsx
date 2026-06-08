@@ -37,10 +37,25 @@ export default function PwaInstallCard() {
   const [installing, setInstalling] = useState(false);
   const timedOut = useRef(false);
   const hasDeferred = useRef(false);
+  const initialized = useRef(false);
+
+  if (typeof window !== 'undefined' && !initialized.current) {
+    initialized.current = true;
+    console.log('[PWA] Install card mounted');
+    console.log('[PWA] Standalone:', isStandalone());
+    console.log('[PWA] iOS:', isIOS());
+    console.log('[PWA] ServiceWorker' in navigator ? 'supported' : 'unsupported');
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistration().then((reg) => {
+        console.log('[PWA] SW registration:', reg ? 'active' : 'none');
+      });
+    }
+  }
 
   const dismissPermanently = useCallback(() => {
     setLs(LS.DISMISSED, 'true');
     setVisible(false);
+    console.log('[PWA] Install dismissed permanently');
   }, []);
 
   const handleInstall = useCallback(async () => {
@@ -51,19 +66,24 @@ export default function PwaInstallCard() {
     if (!deferredPrompt) return;
     setInstalling(true);
     try {
+      console.log('[PWA] Triggering install prompt');
       deferredPrompt.prompt();
       const { outcome } = await deferredPrompt.userChoice;
+      console.log('[PWA] Install outcome:', outcome);
       if (outcome === 'accepted') {
         setLs(LS.COMPLETED, 'true');
         setVisible(false);
       }
-    } catch {}
+    } catch (err) {
+      console.error('[PWA] Install prompt error:', err);
+    }
     setDeferredPrompt(null);
     setInstalling(false);
   }, [deferredPrompt, isIOSDevice, dismissPermanently]);
 
   useEffect(() => {
     if (isStandalone()) {
+      console.log('[PWA] Already in standalone mode, skipping install');
       setLs(LS.COMPLETED, 'true');
       return;
     }
@@ -74,7 +94,10 @@ export default function PwaInstallCard() {
     const alreadyCompleted = getLs(LS.COMPLETED) === 'true';
     const alreadyDismissed = getLs(LS.DISMISSED) === 'true';
 
-    if (alreadyCompleted) return;
+    if (alreadyCompleted) {
+      console.log('[PWA] Already installed, hiding card');
+      return;
+    }
 
     const sessions = getSessionCount() + 1;
     setLs(LS.SESSIONS, sessions);
@@ -83,34 +106,53 @@ export default function PwaInstallCard() {
       setLs(LS.FIRST_VISIT, String(Date.now()));
     }
 
+    console.log('[PWA] Session count:', sessions);
+
     const meetsSessionThreshold = sessions >= 2;
-    if (alreadyDismissed || !meetsSessionThreshold) return;
+    if (alreadyDismissed || !meetsSessionThreshold) {
+      if (alreadyDismissed) console.log('[PWA] Previously dismissed');
+      if (!meetsSessionThreshold) console.log('[PWA] Below session threshold');
+      return;
+    }
 
     const canShow = () => timedOut.current && (hasDeferred.current || iOS);
 
     const tryShow = () => {
-      if (canShow()) setVisible(true);
+      if (canShow()) {
+        console.log('[PWA] Showing install card');
+        setVisible(true);
+      }
     };
 
     const timer = setTimeout(() => {
       timedOut.current = true;
+      console.log('[PWA] Initial delay elapsed');
       tryShow();
-    }, 60000);
+    }, 30000);
 
     const handleBeforeInstall = (e) => {
       e.preventDefault();
+      console.log('[PWA] beforeinstallprompt fired');
       hasDeferred.current = true;
       setDeferredPrompt(e);
       tryShow();
     };
 
+    const handleAppInstalled = () => {
+      console.log('[PWA] appinstalled event fired');
+      setLs(LS.COMPLETED, 'true');
+      setVisible(false);
+    };
+
     window.addEventListener('beforeinstallprompt', handleBeforeInstall);
+    window.addEventListener('appinstalled', handleAppInstalled);
 
     return () => {
       clearTimeout(timer);
       window.removeEventListener('beforeinstallprompt', handleBeforeInstall);
+      window.removeEventListener('appinstalled', handleAppInstalled);
     };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   if (!visible) return null;
 
@@ -124,7 +166,7 @@ export default function PwaInstallCard() {
       <div className="pwa-card" role="document">
         <button
           className="pwa-close"
-          onClick={dismiss}
+          onClick={dismissPermanently}
           aria-label="Close install prompt"
           type="button"
         >
@@ -177,7 +219,7 @@ export default function PwaInstallCard() {
             disabled={installing}
             type="button"
           >
-            {installing ? 'Installing…' : isIOSDevice ? 'Got it' : 'Install'}
+            {installing ? 'Installing\u2026' : isIOSDevice ? 'Got it' : 'Install Now'}
           </button>
           <button
             className="pwa-btn pwa-btn-later"
