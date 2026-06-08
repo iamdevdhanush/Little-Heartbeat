@@ -1,7 +1,6 @@
 import React, { useEffect } from 'react';
 import { useReminderStore } from '../../reminder/reminderStore.js';
 import ReminderList from './ReminderList.jsx';
-import AdherenceCard from './AdherenceCard.jsx';
 
 export default function ReminderPanel({ userId, showStats = true, compact = false }) {
   const todayReminders = useReminderStore((s) => s.todayReminders);
@@ -116,8 +115,33 @@ export default function ReminderPanel({ userId, showStats = true, compact = fals
 
       {/* Adherence + streaks */}
       {showStats && !compact && (
-        <div style={{ marginTop: 24 }}>
-          <AdherenceCard adherence={adherence} streaks={streaks} />
+        <div style={{
+          marginTop: 24, padding: 16, borderRadius: 'var(--radius-card)',
+          background: 'var(--color-surface)', border: '1px solid var(--color-border)',
+        }}>
+          <p style={{ fontSize: 14, fontWeight: 700, color: 'var(--color-text-primary)', marginBottom: 12 }}>
+            📊 Adherence
+          </p>
+          <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
+            <div>
+              <p style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>Today</p>
+              <p style={{ fontSize: 20, fontWeight: 800, color: 'var(--color-success)' }}>
+                {adherence?.daily?.rate ?? 0}%
+              </p>
+            </div>
+            <div>
+              <p style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>7-Day</p>
+              <p style={{ fontSize: 20, fontWeight: 800, color: 'var(--color-primary)' }}>
+                {adherence?.weekly?.rate ?? 0}%
+              </p>
+            </div>
+            <div>
+              <p style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>Streak</p>
+              <p style={{ fontSize: 20, fontWeight: 800, color: 'var(--color-accent)' }}>
+                {streaks?.current ?? 0} days
+              </p>
+            </div>
+          </div>
         </div>
       )}
     </div>
