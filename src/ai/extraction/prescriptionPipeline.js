@@ -48,16 +48,30 @@ export async function processPrescriptionFile(file, options = {}) {
     let textCount = 0;
 
     for (let i = 0; i < images.length; i++) {
-      const percent = Math.round(((i) / images.length) * 80);
+      const pageLabel = `Recognizing page ${i + 1} of ${images.length}...`;
+      const pageBase = Math.round(((i) / images.length) * 80);
       onProgress({
         phase: 'ocr',
-        message: `Recognizing page ${i + 1} of ${images.length}...`,
-        percent,
+        message: pageLabel,
+        percent: pageBase,
         page: i + 1,
         totalPages: images.length,
       });
 
-      const result = await recognizeImage(images[i].imageUrl, { onProgress });
+      const result = await recognizeImage(images[i].imageUrl, {
+        onProgress: (tp) => {
+          const pct = Math.round(
+            ((i + (tp.progress || 0)) / images.length) * 80,
+          );
+          onProgress({
+            phase: 'ocr',
+            message: pageLabel,
+            percent: pct,
+            page: i + 1,
+            totalPages: images.length,
+          });
+        },
+      });
 
       if (result.text) {
         combinedText += result.text + '\n';
