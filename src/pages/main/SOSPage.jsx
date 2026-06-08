@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useUser } from '../../hooks/useUser.js';
 import { usePregnancy } from '../../hooks/usePregnancy.js';
 import { getEmergencyContacts } from '../../services/sosService.js';
 
@@ -18,7 +19,8 @@ function EmptyState({ icon, title, subtitle }) {
 }
 
 export default function SOSPage() {
-  const { week } = usePregnancy();
+  const { user } = useUser();
+  const { week } = usePregnancy(user?.id);
   const [contacts, setContacts] = useState([]);
   const [contactsLoading, setContactsLoading] = useState(true);
 

@@ -39,7 +39,8 @@ export default function PwaInstallCard() {
   const hasDeferred = useRef(false);
   const initialized = useRef(false);
 
-  if (typeof window !== 'undefined' && !initialized.current) {
+  useEffect(() => {
+    if (initialized.current) return;
     initialized.current = true;
     console.log('[PWA] Install card mounted');
     console.log('[PWA] Standalone:', isStandalone());
@@ -50,7 +51,7 @@ export default function PwaInstallCard() {
         console.log('[PWA] SW registration:', reg ? 'active' : 'none');
       });
     }
-  }
+  }, []);
 
   const dismissPermanently = useCallback(() => {
     setLs(LS.DISMISSED, 'true');
@@ -115,7 +116,7 @@ export default function PwaInstallCard() {
       return;
     }
 
-    const canShow = () => timedOut.current && (hasDeferred.current || iOS);
+    const canShow = () => hasDeferred.current || iOS;
 
     const tryShow = () => {
       if (canShow()) {

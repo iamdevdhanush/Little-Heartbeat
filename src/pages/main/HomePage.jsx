@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useUser } from '../../hooks/useUser.js';
 import { usePregnancy } from '../../hooks/usePregnancy.js';
@@ -50,11 +50,21 @@ function PriorityCard({ icon, title, subtitle, color, to }) {
   );
 }
 
+const LOAD_TIMEOUT = 5000;
+
 export default function HomePage() {
   const { user, loading: userLoading } = useUser();
   const { pregnancy, week, babyGrowth, loading: pregLoading } = usePregnancy(user?.id);
   const { medications, loading: medLoading } = useMedication(user?.id);
   const { nextAppointment, loading: apptLoading } = useAppointments(user?.id);
+
+  const [forceLoaded, setForceLoaded] = useState(false);
+  useEffect(() => {
+    const timer = setTimeout(() => setForceLoaded(true), LOAD_TIMEOUT);
+    return () => clearTimeout(timer);
+  }, []);
+
+  const isLoading = !forceLoaded && (userLoading || pregLoading || medLoading || apptLoading);
 
   const todayMeds = useMemo(() => {
     return (medications || []).filter(m => m.active !== false).slice(0, 3);
@@ -65,7 +75,7 @@ export default function HomePage() {
     return daysUntil(nextAppointment.date);
   }, [nextAppointment]);
 
-  if (userLoading || pregLoading || medLoading || apptLoading) {
+  if (isLoading) {
     return (
       <div className="screen" style={{ paddingTop: 40 }}>
         <div className="animate-fade-in-up" style={{ textAlign: 'center', padding: '60px 20px' }}>
