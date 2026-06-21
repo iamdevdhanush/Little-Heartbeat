@@ -1,373 +1,1007 @@
 -- ============================================================
--- LITTLE HEARTBEAT — Supabase Schema
--- All 11 tables with RLS, indexes, and triggers
+-- LITTLE HEARTBEAT — Complete Database Schema
+-- Version: 2.0 (Redesigned)
+-- Engine: PostgreSQL 16+ (with PostGIS)
 -- ============================================================
 
--- ── 1. USERS ──
-CREATE TABLE users (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  auth_id UUID UNIQUE REFERENCES auth.users(id) ON DELETE CASCADE,
-  email TEXT UNIQUE,
-  name TEXT NOT NULL DEFAULT '',
-  avatar_initial TEXT GENERATED ALWAYS AS (UPPER(LEFT(name, 1))) STORED,
-  phone TEXT DEFAULT '',
-  blood_type TEXT DEFAULT '',
-  allergies TEXT[] DEFAULT '{}',
-  medical_conditions TEXT[] DEFAULT '{}',
-  region TEXT DEFAULT 'other',
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
-);
-ALTER TABLE users ENABLE ROW LEVEL SECURITY;
-CREATE POLICY users_own ON users FOR ALL USING (auth_id = auth.uid());
+-- ============================================================
+-- EXTENSIONS
+-- ============================================================
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+CREATE EXTENSION IF NOT EXISTS "postgis";
 
--- ── 2. PREGNANCIES ──
-CREATE TABLE pregnancies (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  due_date DATE NOT NULL,
-  conception_date DATE GENERATED ALWAYS AS (due_date - INTERVAL '280 days') STORED,
-  current_week INTEGER GENERATED ALWAYS AS (
-    GREATEST(1, LEAST(42, FLOOR(EXTRACT(EPOCH FROM (NOW() - (due_date - INTERVAL '280 days'))) / 604800)::INTEGER + 1))
-  ) STORED,
-  trimester INTEGER GENERATED ALWAYS AS (
-    CASE WHEN current_week <= 13 THEN 1 WHEN current_week <= 27 THEN 2 ELSE 3 END
-  ) STORED,
-  baby_name TEXT DEFAULT '',
-  fetal_sex TEXT DEFAULT '' CHECK (fetal_sex IN ('', 'female', 'male', 'unknown')),
-  is_active BOOLEAN DEFAULT true,
-  notes TEXT DEFAULT '',
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
-);
-ALTER TABLE pregnancies ENABLE ROW LEVEL SECURITY;
-CREATE POLICY pregnancies_own ON pregnancies FOR ALL USING (user_id = auth.uid());
-CREATE INDEX idx_pregnancies_user ON pregnancies(user_id);
-
--- ── 3. MEDICATIONS ──
-CREATE TABLE medications (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  pregnancy_id UUID REFERENCES pregnancies(id) ON DELETE SET NULL,
-  name TEXT NOT NULL,
-  dosage TEXT DEFAULT '',
-  frequency TEXT DEFAULT '',
-  frequency_numeric INTEGER,
-  frequency_per TEXT DEFAULT 'day',
-  timing TEXT DEFAULT '',
-  duration TEXT DEFAULT '',
-  instructions TEXT DEFAULT '',
-  prescribed_by TEXT DEFAULT '',
-  refill_date DATE,
-  refill_reminder BOOLEAN DEFAULT false,
-  active BOOLEAN DEFAULT true,
-  started_at DATE DEFAULT CURRENT_DATE,
-  ended_at DATE,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
-);
-ALTER TABLE medications ENABLE ROW LEVEL SECURITY;
-CREATE POLICY medications_own ON medications FOR ALL USING (user_id = auth.uid());
-CREATE INDEX idx_medications_user ON medications(user_id);
-CREATE INDEX idx_medications_active ON medications(user_id, active);
-
--- ── 4. REMINDERS ──
+-- ============================================================
+-- ENUMS
+-- ============================================================
+CREATE TYPE auth_provider AS ENUM ('email', 'google', 'apple');
+CREATE TYPE device_type AS ENUM ('web', 'ios', 'android');
+CREATE TYPE trimester AS ENUM ('first', 'second', 'third');
+CREATE TYPE fetal_sex AS ENUM ('male', 'female', 'unknown', 'multiple');
+CREATE TYPE appointment_status AS ENUM ('scheduled', 'confirmed', 'completed', 'cancelled', 'missed');
 CREATE TYPE reminder_status AS ENUM ('pending', 'taken', 'skipped', 'missed', 'snoozed');
-CREATE TABLE reminders (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  medication_id UUID REFERENCES medications(id) ON DELETE CASCADE,
-  scheduled_time TIMESTAMPTZ NOT NULL,
-  status reminder_status DEFAULT 'pending',
-  taken_at TIMESTAMPTZ,
-  skipped_at TIMESTAMPTZ,
-  snoozed_until TIMESTAMPTZ,
-  notify_count INTEGER DEFAULT 0,
-  date DATE NOT NULL DEFAULT CURRENT_DATE,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
-);
-ALTER TABLE reminders ENABLE ROW LEVEL SECURITY;
-CREATE POLICY reminders_own ON reminders FOR ALL USING (user_id = auth.uid());
-CREATE INDEX idx_reminders_user_date ON reminders(user_id, date);
-CREATE INDEX idx_reminders_status ON reminders(status);
+CREATE TYPE medication_timing AS ENUM ('morning', 'afternoon', 'evening', 'night', 'as_needed');
+CREATE TYPE symptom_severity AS ENUM ('mild', 'moderate', 'severe', 'emergency');
+CREATE TYPE document_category AS ENUM ('prescription', 'lab_report', 'ultrasound', 'medical_record', 'insurance', 'other');
+CREATE TYPE health_record_type AS ENUM ('lab_result', 'vaccination', 'allergy', 'condition', 'surgery', 'medication');
+CREATE TYPE community_post_category AS ENUM ('general', 'symptoms', 'nutrition', 'exercise', 'mental_health', 'baby_prep', 'birth_story', 'postpartum', 'ask_community');
+CREATE TYPE post_status AS ENUM ('published', 'hidden', 'removed', 'flagged');
+CREATE TYPE report_reason AS ENUM ('spam', 'harassment', 'medical_misinformation', 'inappropriate', 'other');
+CREATE TYPE report_status AS ENUM ('pending', 'reviewed', 'dismissed', 'actioned');
+CREATE TYPE notification_channel AS ENUM ('push', 'email', 'sms', 'in_app');
+CREATE TYPE notification_priority AS ENUM ('low', 'normal', 'high', 'emergency');
+CREATE TYPE partner_role AS ENUM ('partner', 'family', 'doula', 'friend');
+CREATE TYPE partner_status AS ENUM ('pending', 'active', 'declined', 'revoked');
+CREATE TYPE ai_message_role AS ENUM ('user', 'assistant', 'system');
+CREATE TYPE sos_alert_type AS ENUM ('panic', 'fall', 'medical_emergency');
+CREATE TYPE sos_status AS ENUM ('active', 'resolved', 'cancelled');
 
--- ── 5. DOCUMENTS ──
-CREATE TABLE documents (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  pregnancy_id UUID REFERENCES pregnancies(id) ON DELETE SET NULL,
-  title TEXT NOT NULL,
-  category TEXT NOT NULL CHECK (category IN ('prescription', 'lab_report', 'scan', 'medical', 'other')),
-  file_type TEXT DEFAULT '',
-  file_size INTEGER DEFAULT 0,
-  file_url TEXT DEFAULT '',
-  ocr_text TEXT DEFAULT '',
-  ai_summary JSONB DEFAULT '{}',
-  tags TEXT[] DEFAULT '{}',
-  uploaded_at TIMESTAMPTZ DEFAULT NOW(),
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
-);
-ALTER TABLE documents ENABLE ROW LEVEL SECURITY;
-CREATE POLICY documents_own ON documents FOR ALL USING (user_id = auth.uid());
-CREATE INDEX idx_documents_user ON documents(user_id);
-CREATE INDEX idx_documents_category ON documents(user_id, category);
+-- ============================================================
+-- 1. USERS & AUTHENTICATION
+-- ============================================================
 
--- ── 6. APPOINTMENTS ──
-CREATE TABLE appointments (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  pregnancy_id UUID REFERENCES pregnancies(id) ON DELETE SET NULL,
-  title TEXT NOT NULL,
-  doctor_name TEXT DEFAULT '',
-  clinic_name TEXT DEFAULT '',
-  location TEXT DEFAULT '',
-  scheduled_at TIMESTAMPTZ NOT NULL,
-  duration_minutes INTEGER DEFAULT 30,
-  notes TEXT DEFAULT '',
-  status TEXT DEFAULT 'upcoming' CHECK (status IN ('upcoming', 'completed', 'cancelled', 'rescheduled')),
-  reminder_sent BOOLEAN DEFAULT false,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
+-- Core user table (separate from auth.users for portability)
+CREATE TABLE users (
+    id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    email           VARCHAR(255) UNIQUE NOT NULL,
+    email_verified  TIMESTAMPTZ,
+    phone           VARCHAR(20),
+    phone_verified  TIMESTAMPTZ,
+    password_hash   VARCHAR(255),
+    auth_provider   auth_provider DEFAULT 'email',
+    auth_provider_id VARCHAR(255),
+    is_active       BOOLEAN DEFAULT TRUE,
+    is_onboarded    BOOLEAN DEFAULT FALSE,
+    is_admin        BOOLEAN DEFAULT FALSE,
+    is_moderator    BOOLEAN DEFAULT FALSE,
+    is_deleted      BOOLEAN DEFAULT FALSE,
+    deleted_at      TIMESTAMPTZ,
+    created_at      TIMESTAMPTZ DEFAULT NOW(),
+    updated_at      TIMESTAMPTZ DEFAULT NOW()
 );
-ALTER TABLE appointments ENABLE ROW LEVEL SECURITY;
-CREATE POLICY appointments_own ON appointments FOR ALL USING (user_id = auth.uid());
-CREATE INDEX idx_appointments_user_date ON appointments(user_id, scheduled_at);
 
--- ── 7. SYMPTOMS ──
+CREATE INDEX idx_users_email ON users(email) WHERE is_deleted = FALSE;
+CREATE INDEX idx_users_auth_provider ON users(auth_provider, auth_provider_id) WHERE is_deleted = FALSE;
+
+-- Session management
+CREATE TABLE refresh_tokens (
+    id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id         UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    token_hash      VARCHAR(255) NOT NULL,
+    device_id       VARCHAR(255),
+    device_name     VARCHAR(255),
+    device_type     device_type DEFAULT 'web',
+    ip_address      INET,
+    user_agent      TEXT,
+    expires_at      TIMESTAMPTZ NOT NULL,
+    is_revoked      BOOLEAN DEFAULT FALSE,
+    revoked_at      TIMESTAMPTZ,
+    created_at      TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_refresh_tokens_user ON refresh_tokens(user_id, is_revoked);
+CREATE INDEX idx_refresh_tokens_hash ON refresh_tokens(token_hash);
+CREATE INDEX idx_refresh_tokens_expires ON refresh_tokens(expires_at) WHERE is_revoked = FALSE;
+
+-- Login audit trail
+CREATE TABLE login_history (
+    id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id         UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    ip_address      INET,
+    user_agent      TEXT,
+    device_info     JSONB,
+    login_method    VARCHAR(20),
+    success         BOOLEAN DEFAULT TRUE,
+    failure_reason  VARCHAR(100),
+    created_at      TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_login_history_user ON login_history(user_id, created_at DESC);
+
+-- ============================================================
+-- 2. PROFILES
+-- ============================================================
+
+CREATE TABLE profiles (
+    id                      UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id                 UUID UNIQUE NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    display_name            VARCHAR(100) NOT NULL,
+    avatar_url              TEXT,
+    date_of_birth           DATE,
+    blood_type              VARCHAR(5),
+    allergies               TEXT[] DEFAULT '{}',
+    medical_conditions      TEXT[] DEFAULT '{}',
+    previous_pregnancies    INTEGER DEFAULT 0,
+    language                VARCHAR(10) DEFAULT 'en',
+    timezone                VARCHAR(50) DEFAULT 'UTC',
+    country                 VARCHAR(100),
+    region                  VARCHAR(100),
+    height_cm               NUMERIC(5,1),
+    emergency_contact_name  VARCHAR(100),
+    emergency_contact_phone VARCHAR(20),
+    onboarding_completed    BOOLEAN DEFAULT FALSE,
+    onboarding_step         VARCHAR(50) DEFAULT 'welcome',
+    notification_settings   JSONB DEFAULT '{
+        "push_enabled": true,
+        "email_enabled": true,
+        "sms_enabled": false,
+        "quiet_hours_start": "22:00",
+        "quiet_hours_end": "07:00",
+        "categories": {
+            "reminder": {"push": true, "email": false},
+            "appointment": {"push": true, "email": true},
+            "insight": {"push": true, "email": false},
+            "community": {"push": true, "email": false},
+            "emergency": {"push": true, "email": true, "sms": true}
+        }
+    }',
+    created_at              TIMESTAMPTZ DEFAULT NOW(),
+    updated_at              TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- ============================================================
+-- 3. PREGNANCIES
+-- ============================================================
+
+CREATE TABLE pregnancies (
+    id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id         UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    due_date        DATE NOT NULL,
+    conception_date DATE GENERATED ALWAYS AS (due_date - INTERVAL '280 days') STORED,
+    current_week    INTEGER GENERATED ALWAYS AS (
+        GREATEST(0, LEAST(42, EXTRACT(WEEK FROM AGE(due_date - INTERVAL '280 days', NOW()))::INTEGER))
+    ) STORED,
+    trimester       trimester GENERATED ALWAYS AS (
+        CASE
+            WHEN (GREATEST(0, LEAST(42, EXTRACT(WEEK FROM AGE(due_date - INTERVAL '280 days', NOW()))::INTEGER))) <= 12 THEN 'first'::trimester
+            WHEN (GREATEST(0, LEAST(42, EXTRACT(WEEK FROM AGE(due_date - INTERVAL '280 days', NOW()))::INTEGER))) <= 27 THEN 'second'::trimester
+            ELSE 'third'::trimester
+        END
+    ) STORED,
+    baby_name       VARCHAR(100),
+    fetal_sex       fetal_sex DEFAULT 'unknown',
+    is_active       BOOLEAN DEFAULT TRUE,
+    ended_at        TIMESTAMPTZ,
+    end_reason      VARCHAR(50),
+    notes           TEXT,
+    created_at      TIMESTAMPTZ DEFAULT NOW(),
+    updated_at      TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_pregnancies_user_active ON pregnancies(user_id, is_active) WHERE is_active = TRUE;
+CREATE INDEX idx_pregnancies_due_date ON pregnancies(due_date);
+
+-- ============================================================
+-- 4. PREGNANCY MILESTONES
+-- ============================================================
+
+CREATE TABLE pregnancy_milestones (
+    id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    pregnancy_id    UUID NOT NULL REFERENCES pregnancies(id) ON DELETE CASCADE,
+    week            INTEGER NOT NULL CHECK (week BETWEEN 1 AND 42),
+    title           VARCHAR(200) NOT NULL,
+    description     TEXT,
+    category        VARCHAR(50) NOT NULL,
+    icon            VARCHAR(50),
+    is_completed    BOOLEAN DEFAULT FALSE,
+    completed_at    TIMESTAMPTZ,
+    created_at      TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_milestones_pregnancy ON pregnancy_milestones(pregnancy_id, week);
+
+-- ============================================================
+-- 5. SYMPTOMS
+-- ============================================================
+
 CREATE TABLE symptoms (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  pregnancy_id UUID REFERENCES pregnancies(id) ON DELETE SET NULL,
-  symptom TEXT NOT NULL,
-  severity INTEGER DEFAULT 1 CHECK (severity BETWEEN 1 AND 5),
-  notes TEXT DEFAULT '',
-  logged_at TIMESTAMPTZ DEFAULT NOW(),
-  date DATE NOT NULL DEFAULT CURRENT_DATE
+    id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    pregnancy_id    UUID NOT NULL REFERENCES pregnancies(id) ON DELETE CASCADE,
+    user_id         UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    symptom         VARCHAR(100) NOT NULL,
+    severity        symptom_severity NOT NULL,
+    severity_score  INTEGER CHECK (severity_score BETWEEN 1 AND 10),
+    duration_minutes INTEGER,
+    triggers        TEXT[],
+    relief_methods  TEXT[],
+    notes           TEXT,
+    logged_at       TIMESTAMPTZ DEFAULT NOW(),
+    date            DATE DEFAULT CURRENT_DATE
 );
-ALTER TABLE symptoms ENABLE ROW LEVEL SECURITY;
-CREATE POLICY symptoms_own ON symptoms FOR ALL USING (user_id = auth.uid());
-CREATE INDEX idx_symptoms_user_date ON symptoms(user_id, date);
 
--- ── 8. MOODS ──
-CREATE TABLE moods (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  pregnancy_id UUID REFERENCES pregnancies(id) ON DELETE SET NULL,
-  mood TEXT NOT NULL,
-  emoji TEXT DEFAULT '',
-  notes TEXT DEFAULT '',
-  logged_at TIMESTAMPTZ DEFAULT NOW(),
-  date DATE NOT NULL DEFAULT CURRENT_DATE
+CREATE INDEX idx_symptoms_pregnancy ON symptoms(pregnancy_id, date DESC);
+CREATE INDEX idx_symptoms_user_date ON symptoms(user_id, date DESC);
+CREATE INDEX idx_symptoms_severity ON symptoms(severity) WHERE severity IN ('severe', 'emergency');
+
+-- ============================================================
+-- 6. WEIGHT TRACKING
+-- ============================================================
+
+CREATE TABLE weight_logs (
+    id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    pregnancy_id    UUID NOT NULL REFERENCES pregnancies(id) ON DELETE CASCADE,
+    user_id         UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    weight_kg       NUMERIC(5,2) NOT NULL,
+    notes           TEXT,
+    logged_at       TIMESTAMPTZ DEFAULT NOW(),
+    date            DATE DEFAULT CURRENT_DATE
 );
-ALTER TABLE moods ENABLE ROW LEVEL SECURITY;
-CREATE POLICY moods_own ON moods FOR ALL USING (user_id = auth.uid());
-CREATE INDEX idx_moods_user_date ON moods(user_id, date);
 
--- ── 9. WATER_LOGS ──
+CREATE INDEX idx_weight_pregnancy ON weight_logs(pregnancy_id, date DESC);
+
+-- ============================================================
+-- 7. BLOOD PRESSURE TRACKING
+-- ============================================================
+
+CREATE TABLE blood_pressure_logs (
+    id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    pregnancy_id    UUID NOT NULL REFERENCES pregnancies(id) ON DELETE CASCADE,
+    user_id         UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    systolic        INTEGER NOT NULL CHECK (systolic BETWEEN 60 AND 300),
+    diastolic       INTEGER NOT NULL CHECK (diastolic BETWEEN 30 AND 200),
+    heart_rate      INTEGER CHECK (heart_rate BETWEEN 30 AND 250),
+    is_manual       BOOLEAN DEFAULT TRUE,
+    notes           TEXT,
+    logged_at       TIMESTAMPTZ DEFAULT NOW(),
+    date            DATE DEFAULT CURRENT_DATE
+);
+
+CREATE INDEX idx_bp_pregnancy ON blood_pressure_logs(pregnancy_id, date DESC);
+
+-- ============================================================
+-- 8. BABY GROWTH TRACKING
+-- ============================================================
+
+CREATE TABLE baby_growth_logs (
+    id                   UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    pregnancy_id         UUID NOT NULL REFERENCES pregnancies(id) ON DELETE CASCADE,
+    user_id              UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    week                 INTEGER NOT NULL CHECK (week BETWEEN 1 AND 42),
+    estimated_weight_g   INTEGER,
+    estimated_length_cm  NUMERIC(5,1),
+    head_circumference_cm NUMERIC(4,1),
+    heart_rate_bpm       INTEGER,
+    movement_level       VARCHAR(20),
+    source               VARCHAR(20) DEFAULT 'manual',
+    notes                TEXT,
+    logged_at            TIMESTAMPTZ DEFAULT NOW(),
+    date                 DATE DEFAULT CURRENT_DATE
+);
+
+CREATE INDEX idx_baby_growth_pregnancy ON baby_growth_logs(pregnancy_id, week);
+CREATE INDEX idx_baby_growth_date ON baby_growth_logs(pregnancy_id, date DESC);
+
+-- ============================================================
+-- 9. MOOD TRACKING
+-- ============================================================
+
+CREATE TABLE mood_logs (
+    id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    pregnancy_id    UUID NOT NULL REFERENCES pregnancies(id) ON DELETE CASCADE,
+    user_id         UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    mood            VARCHAR(50) NOT NULL,
+    emoji           VARCHAR(10),
+    energy_level    INTEGER CHECK (energy_level BETWEEN 1 AND 5),
+    sleep_hours     NUMERIC(3,1),
+    notes           TEXT,
+    logged_at       TIMESTAMPTZ DEFAULT NOW(),
+    date            DATE DEFAULT CURRENT_DATE
+);
+
+CREATE INDEX idx_mood_pregnancy ON mood_logs(pregnancy_id, date DESC);
+
+-- ============================================================
+-- 10. WATER & NUTRITION TRACKING
+-- ============================================================
+
 CREATE TABLE water_logs (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  pregnancy_id UUID REFERENCES pregnancies(id) ON DELETE SET NULL,
-  glasses INTEGER NOT NULL DEFAULT 1,
-  logged_at TIMESTAMPTZ DEFAULT NOW(),
-  date DATE NOT NULL DEFAULT CURRENT_DATE
+    id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    pregnancy_id    UUID NOT NULL REFERENCES pregnancies(id) ON DELETE CASCADE,
+    user_id         UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    glasses_ml      INTEGER NOT NULL DEFAULT 250,
+    logged_at       TIMESTAMPTZ DEFAULT NOW(),
+    date            DATE DEFAULT CURRENT_DATE
 );
-ALTER TABLE water_logs ENABLE ROW LEVEL SECURITY;
-CREATE POLICY water_logs_own ON water_logs FOR ALL USING (user_id = auth.uid());
-CREATE INDEX idx_water_logs_user_date ON water_logs(user_id, date);
 
--- ── 10. TIMELINE_EVENTS ──
-CREATE TYPE event_category AS ENUM ('milestone', 'appointment', 'scan', 'symptom', 'achievement', 'note');
+CREATE INDEX idx_water_pregnancy ON water_logs(pregnancy_id, date DESC);
+
+CREATE TABLE nutrition_logs (
+    id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    pregnancy_id    UUID NOT NULL REFERENCES pregnancies(id) ON DELETE CASCADE,
+    user_id         UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    meal_type       VARCHAR(20) NOT NULL,
+    food_items      TEXT[] NOT NULL,
+    calories        INTEGER,
+    notes           TEXT,
+    logged_at       TIMESTAMPTZ DEFAULT NOW(),
+    date            DATE DEFAULT CURRENT_DATE
+);
+
+CREATE INDEX idx_nutrition_pregnancy ON nutrition_logs(pregnancy_id, date DESC);
+
+-- ============================================================
+-- 11. DOCTORS & APPOINTMENTS
+-- ============================================================
+
+CREATE TABLE doctors (
+    id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id         UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    name            VARCHAR(200) NOT NULL,
+    specialty       VARCHAR(100),
+    clinic_name     VARCHAR(200),
+    phone           VARCHAR(20),
+    email           VARCHAR(255),
+    address         TEXT,
+    notes           TEXT,
+    is_primary      BOOLEAN DEFAULT FALSE,
+    created_at      TIMESTAMPTZ DEFAULT NOW(),
+    updated_at      TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_doctors_user ON doctors(user_id);
+
+CREATE TABLE appointments (
+    id                  UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    pregnancy_id        UUID NOT NULL REFERENCES pregnancies(id) ON DELETE CASCADE,
+    user_id             UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    doctor_id           UUID REFERENCES doctors(id) ON DELETE SET NULL,
+    title               VARCHAR(200) NOT NULL,
+    appointment_type    VARCHAR(50),
+    scheduled_at        TIMESTAMPTZ NOT NULL,
+    duration_minutes    INTEGER DEFAULT 30,
+    location            TEXT,
+    location_coords     POINT,
+    notes               TEXT,
+    status              appointment_status DEFAULT 'scheduled',
+    reminder_sent       BOOLEAN DEFAULT FALSE,
+    reminder_sent_at    TIMESTAMPTZ,
+    created_at          TIMESTAMPTZ DEFAULT NOW(),
+    updated_at          TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_appointments_pregnancy ON appointments(pregnancy_id, scheduled_at DESC);
+CREATE INDEX idx_appointments_user_status ON appointments(user_id, status);
+CREATE INDEX idx_appointments_scheduled ON appointments(scheduled_at)
+    WHERE status IN ('scheduled', 'confirmed');
+
+-- ============================================================
+-- 12. MEDICATIONS & PRESCRIPTIONS
+-- ============================================================
+
+CREATE TABLE prescriptions (
+    id                  UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    pregnancy_id        UUID REFERENCES pregnancies(id) ON DELETE SET NULL,
+    user_id             UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    doctor_id           UUID REFERENCES doctors(id) ON DELETE SET NULL,
+    raw_text            TEXT,
+    ocr_confidence      NUMERIC(4,3),
+    doctor_info         JSONB,
+    dates_info          JSONB,
+    confidence_scores   JSONB,
+    file_path           TEXT,
+    status              VARCHAR(20) DEFAULT 'pending',
+    reviewed            BOOLEAN DEFAULT FALSE,
+    reviewed_at         TIMESTAMPTZ,
+    created_at          TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_prescriptions_user ON prescriptions(user_id, created_at DESC);
+
+CREATE TABLE medications (
+    id                  UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    pregnancy_id        UUID REFERENCES pregnancies(id) ON DELETE SET NULL,
+    user_id             UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    prescription_id     UUID REFERENCES prescriptions(id) ON DELETE SET NULL,
+    name                VARCHAR(200) NOT NULL,
+    generic_name        VARCHAR(200),
+    dosage              VARCHAR(50),
+    dosage_unit         VARCHAR(20),
+    dosage_amount       NUMERIC(8,2),
+    frequency           VARCHAR(50),
+    frequency_numeric   INTEGER,
+    frequency_per       VARCHAR(20) DEFAULT 'day',
+    timing              medication_timing[],
+    duration_days       INTEGER,
+    instructions        TEXT,
+    prescribed_by       VARCHAR(200),
+    refill_date         DATE,
+    refill_reminder     BOOLEAN DEFAULT FALSE,
+    is_prescription     BOOLEAN DEFAULT TRUE,
+    category            VARCHAR(50),
+    safety_rating       VARCHAR(20),
+    notes               TEXT,
+    active              BOOLEAN DEFAULT TRUE,
+    started_at          DATE,
+    ended_at            DATE,
+    created_at          TIMESTAMPTZ DEFAULT NOW(),
+    updated_at          TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_medications_user_active ON medications(user_id, active);
+CREATE INDEX idx_medications_prescription ON medications(prescription_id);
+
+CREATE TABLE reminders (
+    id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    medication_id   UUID NOT NULL REFERENCES medications(id) ON DELETE CASCADE,
+    user_id         UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    scheduled_time  TIME NOT NULL,
+    days_of_week    INTEGER[] DEFAULT '{0,1,2,3,4,5,6}',
+    status          reminder_status DEFAULT 'pending',
+    taken_at        TIMESTAMPTZ,
+    skipped_at      TIMESTAMPTZ,
+    snoozed_until   TIMESTAMPTZ,
+    skipped_reason  VARCHAR(100),
+    notify_count    INTEGER DEFAULT 0,
+    date            DATE DEFAULT CURRENT_DATE,
+    created_at      TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_reminders_medication ON reminders(medication_id, date);
+CREATE INDEX idx_reminders_user_date ON reminders(user_id, date, status);
+CREATE INDEX idx_reminders_pending ON reminders(status, scheduled_time)
+    WHERE status = 'pending';
+
+-- ============================================================
+-- 13. EMERGENCY & SAFETY
+-- ============================================================
+
+CREATE TABLE emergency_contacts (
+    id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id         UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    name            VARCHAR(100) NOT NULL,
+    phone           VARCHAR(20) NOT NULL,
+    relation        VARCHAR(50),
+    is_primary      BOOLEAN DEFAULT FALSE,
+    can_share_location BOOLEAN DEFAULT TRUE,
+    created_at      TIMESTAMPTZ DEFAULT NOW(),
+    updated_at      TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_emergency_contacts_user ON emergency_contacts(user_id);
+
+CREATE TABLE sos_alerts (
+    id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id         UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    alert_type      sos_alert_type NOT NULL,
+    latitude        NUMERIC(10,7),
+    longitude       NUMERIC(10,7),
+    location_name   TEXT,
+    message         TEXT,
+    contacted_contacts UUID[],
+    status          sos_status DEFAULT 'active',
+    resolved_at     TIMESTAMPTZ,
+    created_at      TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_sos_active ON sos_alerts(user_id, status) WHERE status = 'active';
+
+CREATE TABLE location_shares (
+    id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    alert_id        UUID REFERENCES sos_alerts(id) ON DELETE CASCADE,
+    user_id         UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    contact_id      UUID REFERENCES emergency_contacts(id) ON DELETE CASCADE,
+    latitude        NUMERIC(10,7) NOT NULL,
+    longitude       NUMERIC(10,7) NOT NULL,
+    accuracy_meters INTEGER,
+    shared_at       TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- ============================================================
+-- 14. HOSPITALS
+-- ============================================================
+
+CREATE TABLE hospitals (
+    id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name            VARCHAR(200) NOT NULL,
+    address         TEXT,
+    latitude        NUMERIC(10,7),
+    longitude       NUMERIC(10,7),
+    location        GEOMETRY(POINT, 4326),
+    phone           VARCHAR(20),
+    emergency_phone VARCHAR(20),
+    website         VARCHAR(255),
+    rating          NUMERIC(2,1),
+    has_emergency   BOOLEAN DEFAULT TRUE,
+    has_maternity   BOOLEAN DEFAULT TRUE,
+    has_nicu        BOOLEAN DEFAULT FALSE,
+    specialties     TEXT[],
+    open_hours      JSONB,
+    source          VARCHAR(20) DEFAULT 'osm',
+    created_at      TIMESTAMPTZ DEFAULT NOW(),
+    updated_at      TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_hospitals_location ON hospitals USING GIST(location);
+CREATE INDEX idx_hospitals_maternity ON hospitals(has_maternity) WHERE has_maternity = TRUE;
+CREATE INDEX idx_hospitals_emergency ON hospitals(has_emergency) WHERE has_emergency = TRUE;
+
+-- ============================================================
+-- 15. COMMUNITY
+-- ============================================================
+
+CREATE TABLE community_posts (
+    id                  UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id             UUID REFERENCES users(id) ON DELETE SET NULL,
+    is_anonymous        BOOLEAN DEFAULT FALSE,
+    anonymous_name      VARCHAR(50),
+    title               VARCHAR(200),
+    content             TEXT NOT NULL,
+    category            community_post_category NOT NULL,
+    tags                TEXT[] DEFAULT '{}',
+    is_pinned           BOOLEAN DEFAULT FALSE,
+    status              post_status DEFAULT 'published',
+    moderation_note     TEXT,
+    moderated_by        UUID REFERENCES users(id),
+    moderated_at        TIMESTAMPTZ,
+    view_count          INTEGER DEFAULT 0,
+    like_count          INTEGER DEFAULT 0,
+    comment_count       INTEGER DEFAULT 0,
+    report_count        INTEGER DEFAULT 0,
+    created_at          TIMESTAMPTZ DEFAULT NOW(),
+    updated_at          TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_posts_status ON community_posts(status, created_at DESC)
+    WHERE status = 'published';
+CREATE INDEX idx_posts_category ON community_posts(category, created_at DESC)
+    WHERE status = 'published';
+CREATE INDEX idx_posts_user ON community_posts(user_id) WHERE user_id IS NOT NULL;
+
+CREATE TABLE community_comments (
+    id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    post_id         UUID NOT NULL REFERENCES community_posts(id) ON DELETE CASCADE,
+    parent_id       UUID REFERENCES community_comments(id) ON DELETE CASCADE,
+    user_id         UUID REFERENCES users(id) ON DELETE SET NULL,
+    is_anonymous    BOOLEAN DEFAULT FALSE,
+    content         TEXT NOT NULL,
+    status          post_status DEFAULT 'published',
+    like_count      INTEGER DEFAULT 0,
+    created_at      TIMESTAMPTZ DEFAULT NOW(),
+    updated_at      TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_comments_post ON community_comments(post_id, created_at);
+CREATE INDEX idx_comments_parent ON community_comments(parent_id) WHERE parent_id IS NOT NULL;
+
+CREATE TABLE community_likes (
+    id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id         UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    post_id         UUID REFERENCES community_posts(id) ON DELETE CASCADE,
+    comment_id      UUID REFERENCES community_comments(id) ON DELETE CASCADE,
+    created_at      TIMESTAMPTZ DEFAULT NOW(),
+    CONSTRAINT chk_like_target CHECK (
+        (post_id IS NOT NULL AND comment_id IS NULL) OR
+        (post_id IS NULL AND comment_id IS NOT NULL)
+    ),
+    UNIQUE(user_id, post_id),
+    UNIQUE(user_id, comment_id)
+);
+
+CREATE INDEX idx_likes_post ON community_likes(post_id);
+CREATE INDEX idx_likes_comment ON community_likes(comment_id);
+
+CREATE TABLE community_bookmarks (
+    id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id         UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    post_id         UUID NOT NULL REFERENCES community_posts(id) ON DELETE CASCADE,
+    created_at      TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(user_id, post_id)
+);
+
+CREATE INDEX idx_bookmarks_user ON community_bookmarks(user_id);
+
+CREATE TABLE community_reports (
+    id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    reporter_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    post_id         UUID REFERENCES community_posts(id) ON DELETE CASCADE,
+    comment_id      UUID REFERENCES community_comments(id) ON DELETE CASCADE,
+    reason          report_reason NOT NULL,
+    description     TEXT,
+    status          report_status DEFAULT 'pending',
+    reviewed_by     UUID REFERENCES users(id),
+    reviewed_at     TIMESTAMPTZ,
+    action_taken    VARCHAR(100),
+    created_at      TIMESTAMPTZ DEFAULT NOW(),
+    CONSTRAINT chk_report_target CHECK (
+        (post_id IS NOT NULL AND comment_id IS NULL) OR
+        (post_id IS NULL AND comment_id IS NOT NULL)
+    )
+);
+
+CREATE INDEX idx_reports_status ON community_reports(status) WHERE status = 'pending';
+
+CREATE TABLE community_moderation_actions (
+    id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    moderator_id    UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    action_type     VARCHAR(50) NOT NULL,
+    target_user_id  UUID REFERENCES users(id),
+    target_post_id  UUID REFERENCES community_posts(id),
+    reason          TEXT NOT NULL,
+    duration_days   INTEGER,
+    created_at      TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_mod_actions_moderator ON community_moderation_actions(moderator_id);
+
+-- ============================================================
+-- 16. NOTIFICATIONS
+-- ============================================================
+
+CREATE TABLE notification_tokens (
+    id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id         UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    token           TEXT NOT NULL,
+    platform        device_type NOT NULL,
+    is_active       BOOLEAN DEFAULT TRUE,
+    created_at      TIMESTAMPTZ DEFAULT NOW(),
+    updated_at      TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(token)
+);
+
+CREATE INDEX idx_notif_tokens_user ON notification_tokens(user_id, is_active)
+    WHERE is_active = TRUE;
+
+CREATE TABLE notifications (
+    id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id         UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    title           VARCHAR(200) NOT NULL,
+    body            TEXT,
+    channel         notification_channel NOT NULL,
+    priority        notification_priority DEFAULT 'normal',
+    category        VARCHAR(50),
+    reference_type  VARCHAR(50),
+    reference_id    UUID,
+    action_url      TEXT,
+    is_read         BOOLEAN DEFAULT FALSE,
+    read_at         TIMESTAMPTZ,
+    is_delivered    BOOLEAN DEFAULT FALSE,
+    delivered_at    TIMESTAMPTZ,
+    created_at      TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_notifications_user ON notifications(user_id, created_at DESC);
+CREATE INDEX idx_notifications_unread ON notifications(user_id, is_read)
+    WHERE is_read = FALSE;
+
+-- ============================================================
+-- 17. AI CONVERSATIONS
+-- ============================================================
+
+CREATE TABLE ai_conversations (
+    id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    pregnancy_id    UUID REFERENCES pregnancies(id) ON DELETE SET NULL,
+    user_id         UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    title           VARCHAR(200),
+    context_snapshot JSONB,
+    message_count   INTEGER DEFAULT 0,
+    is_archived     BOOLEAN DEFAULT FALSE,
+    created_at      TIMESTAMPTZ DEFAULT NOW(),
+    updated_at      TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_ai_conv_user ON ai_conversations(user_id, created_at DESC);
+
+CREATE TABLE ai_messages (
+    id                  UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    conversation_id     UUID NOT NULL REFERENCES ai_conversations(id) ON DELETE CASCADE,
+    role                ai_message_role NOT NULL,
+    content             TEXT NOT NULL,
+    content_html        TEXT,
+    metadata            JSONB,
+    context_used        JSONB,
+    is_helpful          BOOLEAN,
+    created_at          TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_ai_messages_conv ON ai_messages(conversation_id, created_at);
+
+-- ============================================================
+-- 18. DOCUMENTS & HEALTH RECORDS
+-- ============================================================
+
+CREATE TABLE documents (
+    id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    pregnancy_id    UUID REFERENCES pregnancies(id) ON DELETE SET NULL,
+    user_id         UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    title           VARCHAR(200),
+    category        document_category NOT NULL,
+    file_type       VARCHAR(50),
+    file_size       INTEGER,
+    file_path       TEXT NOT NULL,
+    file_url        TEXT,
+    thumbnail_url   TEXT,
+    ocr_text        TEXT,
+    ai_summary      JSONB,
+    tags            TEXT[] DEFAULT '{}',
+    uploaded_at     TIMESTAMPTZ DEFAULT NOW(),
+    updated_at      TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_documents_pregnancy ON documents(pregnancy_id);
+CREATE INDEX idx_documents_user ON documents(user_id, category);
+CREATE INDEX idx_documents_fts ON documents USING GIN(to_tsvector('english', COALESCE(ocr_text, '')));
+
+CREATE TABLE health_records (
+    id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    pregnancy_id    UUID REFERENCES pregnancies(id) ON DELETE SET NULL,
+    user_id         UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    record_type     health_record_type NOT NULL,
+    title           VARCHAR(200),
+    value           TEXT,
+    value_json      JSONB,
+    recorded_date   DATE NOT NULL,
+    source          VARCHAR(50) DEFAULT 'manual',
+    document_id     UUID REFERENCES documents(id) ON DELETE SET NULL,
+    notes           TEXT,
+    created_at      TIMESTAMPTZ DEFAULT NOW(),
+    updated_at      TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_health_records_user ON health_records(user_id, record_type);
+CREATE INDEX idx_health_records_pregnancy ON health_records(pregnancy_id, recorded_date DESC);
+
+-- ============================================================
+-- 19. PARTNER / FAMILY SUPPORT
+-- ============================================================
+
+CREATE TABLE partner_links (
+    id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    pregnancy_id    UUID NOT NULL REFERENCES pregnancies(id) ON DELETE CASCADE,
+    inviting_user   UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    invited_user    UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    role            partner_role DEFAULT 'partner',
+    status          partner_status DEFAULT 'pending',
+    permissions     TEXT[] DEFAULT '{"view_timeline", "view_appointments"}',
+    invited_at      TIMESTAMPTZ DEFAULT NOW(),
+    responded_at    TIMESTAMPTZ,
+    created_at      TIMESTAMPTZ DEFAULT NOW(),
+    updated_at      TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(pregnancy_id, invited_user)
+);
+
+CREATE INDEX idx_partner_inviting ON partner_links(inviting_user);
+CREATE INDEX idx_partner_invited ON partner_links(invited_user);
+
+-- ============================================================
+-- 20. TIMELINE EVENTS
+-- ============================================================
+
 CREATE TABLE timeline_events (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  pregnancy_id UUID REFERENCES pregnancies(id) ON DELETE SET NULL,
-  week INTEGER NOT NULL,
-  title TEXT NOT NULL,
-  description TEXT DEFAULT '',
-  emoji TEXT DEFAULT '📌',
-  category event_category DEFAULT 'note',
-  event_date DATE,
-  metadata JSONB DEFAULT '{}',
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
+    id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    pregnancy_id    UUID REFERENCES pregnancies(id) ON DELETE CASCADE,
+    user_id         UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    week            INTEGER CHECK (week BETWEEN 1 AND 42),
+    title           VARCHAR(200) NOT NULL,
+    description     TEXT,
+    emoji           VARCHAR(10),
+    category        VARCHAR(50) NOT NULL,
+    is_system_event BOOLEAN DEFAULT FALSE,
+    event_date      DATE,
+    metadata        JSONB,
+    created_at      TIMESTAMPTZ DEFAULT NOW()
 );
-ALTER TABLE timeline_events ENABLE ROW LEVEL SECURITY;
-CREATE POLICY timeline_events_own ON timeline_events FOR ALL USING (user_id = auth.uid());
-CREATE INDEX idx_timeline_week ON timeline_events(pregnancy_id, week);
 
--- ── 11. USER_INSIGHTS ──
-CREATE TABLE user_insights (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  pregnancy_id UUID REFERENCES pregnancies(id) ON DELETE SET NULL,
-  week INTEGER NOT NULL,
-  insight_text TEXT NOT NULL,
-  tip_text TEXT DEFAULT '',
-  category TEXT DEFAULT 'general' CHECK (category IN ('nutrition', 'exercise', 'medical', 'emotional', 'general')),
-  source TEXT DEFAULT 'system' CHECK (source IN ('system', 'ai', 'doctor', 'user')),
-  created_at TIMESTAMPTZ DEFAULT NOW()
+CREATE INDEX idx_timeline_pregnancy ON timeline_events(pregnancy_id, week);
+CREATE INDEX idx_timeline_user ON timeline_events(user_id, created_at DESC);
+
+-- ============================================================
+-- 21. AUDIT & ADMIN
+-- ============================================================
+
+CREATE TABLE audit_logs (
+    id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id         UUID REFERENCES users(id) ON DELETE SET NULL,
+    action          VARCHAR(100) NOT NULL,
+    resource_type   VARCHAR(50),
+    resource_id     UUID,
+    details         JSONB,
+    ip_address      INET,
+    created_at      TIMESTAMPTZ DEFAULT NOW()
 );
-ALTER TABLE user_insights ENABLE ROW LEVEL SECURITY;
-CREATE POLICY insights_own ON user_insights FOR ALL USING (user_id = auth.uid());
-CREATE INDEX idx_insights_week ON user_insights(pregnancy_id, week);
 
--- ── AUTO-UPDATE TRIGGERS ──
-CREATE OR REPLACE FUNCTION update_timestamp()
+CREATE INDEX idx_audit_user ON audit_logs(user_id, created_at DESC);
+CREATE INDEX idx_audit_action ON audit_logs(action, created_at DESC);
+CREATE INDEX idx_audit_resource ON audit_logs(resource_type, resource_id);
+
+CREATE TABLE admin_actions (
+    id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    admin_id        UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    action_type     VARCHAR(100) NOT NULL,
+    target_user_id  UUID REFERENCES users(id),
+    reason          TEXT,
+    details         JSONB,
+    created_at      TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_admin_actions_admin ON admin_actions(admin_id, created_at DESC);
+
+-- ============================================================
+-- REFERENCE DATA TABLES
+-- ============================================================
+
+CREATE TABLE reference_baby_growth (
+    id              SERIAL PRIMARY KEY,
+    week            INTEGER NOT NULL UNIQUE CHECK (week BETWEEN 1 AND 42),
+    size_emoji      VARCHAR(10),
+    size_label      VARCHAR(100),
+    length_cm       NUMERIC(5,2),
+    weight_g        INTEGER,
+    description     TEXT,
+    development     TEXT[]
+);
+
+CREATE TABLE reference_diet_recommendations (
+    id              SERIAL PRIMARY KEY,
+    trimester       trimester NOT NULL,
+    category        VARCHAR(20) NOT NULL,     -- 'to_eat', 'to_avoid'
+    food_item       VARCHAR(200) NOT NULL,
+    reason          TEXT,
+    daily_serving   VARCHAR(100)
+);
+
+CREATE TABLE reference_body_changes (
+    id              SERIAL PRIMARY KEY,
+    symptom         VARCHAR(100) NOT NULL,
+    explanation     TEXT,
+    self_care_tips  TEXT[],
+    weeks_common    INTEGER[]                  -- Weeks when this is most common
+);
+
+-- ============================================================
+-- SEED DATA
+-- ============================================================
+
+INSERT INTO reference_baby_growth (week, size_emoji, size_label, length_cm, weight_g, description, development) VALUES
+(1, '🌸', 'Poppy Seed', 0.1, 0, 'Your baby is the size of a poppy seed', ARRAY['Fertilization has occurred', 'Cells are rapidly dividing']),
+(2, '🌱', 'Tiny Seed', 0.2, 0, 'Your baby is the size of a tiny seed', ARRAY['Embryo implants in uterus', 'Amniotic sac forms']),
+(3, '💧', 'Water Drop', 0.5, 0, 'Your baby is the size of a water drop', ARRAY['Nervous system begins forming', 'Heart starts beating']),
+(4, '🌾', 'Poppy Seed', 0.1, 0, 'Your baby is the size of a poppy seed', ARRAY['Heart begins to beat', 'Arm and leg buds appear']),
+(5, '🍊', 'Orange Seed', 0.2, 0, 'Your baby is the size of an orange seed', ARRAY['Brain and spinal cord form', 'Umbilical cord develops']),
+(6, '🍚', 'Grain of Rice', 0.3, 0, 'Your baby is the size of a grain of rice', ARRAY['Heartbeat visible on ultrasound', 'Facial features begin forming']),
+(7, '🫐', 'Blueberry', 1.0, 0, 'Your baby is the size of a blueberry', ARRAY['Hands and feet forming', 'Brain hemispheres develop']),
+(8, '🫘', 'Kidney Bean', 1.6, 0, 'Your baby is the size of a kidney bean', ARRAY['All major organs forming', 'Eyelids begin to form']),
+(9, '🍇', 'Grape', 2.3, 2, 'Your baby is the size of a grape', ARRAY['First movements (too small to feel)', 'Fingers and toes appear']),
+(10, '🍓', 'Strawberry', 3.1, 5, 'Your baby is the size of a strawberry', ARRAY['Vital organs fully formed', 'Fingernails begin growing']),
+(11, '🌰', 'Fig', 4.1, 8, 'Your baby is the size of a fig', ARRAY['Genitals begin developing', 'Baby can open and close fists']),
+(12, '🍋', 'Lime', 5.4, 14, 'Your baby is the size of a lime', ARRAY['Reflexes begin', 'Intestines move into abdomen']),
+(13, '🍑', 'Peach', 7.4, 23, 'Your baby is the size of a peach', ARRAY['Vocal cords form', 'Baby can make sucking motions']),
+(14, '🍋', 'Lemon', 8.7, 43, 'Your baby is the size of a lemon', ARRAY['Sex organs identifiable', 'Baby\'s neck is more defined']),
+(15, '🍎', 'Apple', 10.1, 70, 'Your baby is the size of an apple', ARRAY['Baby can hiccup', 'Bones are becoming harder']),
+(16, '🥑', 'Avocado', 11.6, 100, 'Your baby is the size of an avocado', ARRAY['Eyes can move slowly', 'Baby\'s heart pumps about 25L of blood/day']),
+(17, '🥕', 'Carrot', 13.0, 140, 'Your baby is the size of a carrot', ARRAY['Fat stores begin developing', 'Baby can hear sounds']),
+(18, '🍠', 'Sweet Potato', 14.2, 190, 'Your baby is the size of a sweet potato', ARRAY['Baby can yawn and stretch', 'Vernix caseosa covers skin']),
+(19, '🥭', 'Mango', 15.3, 240, 'Your baby is the size of a mango', ARRAY['Senses are developing', 'Baby can swallow amniotic fluid']),
+(20, '🍌', 'Banana', 16.5, 300, 'Your baby is the size of a banana', ARRAY['Baby can hear your voice', 'Lanugo covers baby\'s body']),
+(21, '🥕', 'Carrot', 26.7, 360, 'Your baby is the size of a carrot', ARRAY['Baby can swallow', 'Bone marrow starts making blood cells']),
+(22, '🥥', 'Coconut', 27.8, 430, 'Your baby is the size of a coconut', ARRAY['Eyebrows and eyelashes visible', 'Baby has sleep-wake cycles']),
+(23, '🍑', 'Peach', 28.9, 500, 'Your baby is the size of a large peach', ARRAY['Fingerprints are forming', 'Baby can sense light']),
+(24, '🌽', 'Corn', 30.0, 600, 'Your baby is the size of an ear of corn', ARRAY['Lungs are developing', 'Baby\'s face is fully formed']),
+(25, '🍈', 'Honeydew', 31.0, 685, 'Your baby is the size of a honeydew melon', ARRAY['Hair is growing', 'Baby can make grasping motions']),
+(26, '🥬', 'Kale', 32.0, 760, 'Your baby is the size of a bunch of kale', ARRAY['Eyes are forming', 'Baby responds to touch']),
+(27, '🥦', 'Broccoli', 33.0, 875, 'Your baby is the size of a head of broccoli', ARRAY['Brain is developing rapidly', 'Baby can open and close eyes']),
+(28, '🍆', 'Eggplant', 34.0, 1000, 'Your baby is the size of an eggplant', ARRAY['Lungs can breathe (with help)', 'Baby has regular sleep cycles']),
+(29, '🍄', 'Butternut Squash', 35.0, 1150, 'Your baby is the size of a butternut squash', ARRAY['Baby can kick and stretch', 'Bones are fully developed']),
+(30, '🥒', 'Cucumber', 36.0, 1300, 'Your baby is the size of a cucumber', ARRAY['Baby can recognize your voice', 'Hair is growing thicker']),
+(31, '🥗', 'Lettuce', 37.0, 1500, 'Your baby is the size of a head of lettuce', ARRAY['Baby can turn head', 'All senses are working']),
+(32, '🍠', 'Sweet Potato', 38.0, 1700, 'Your baby is the size of a jicama', ARRAY['Fingernails reach fingertips', 'Baby is in head-down position']),
+(33, '🍍', 'Pineapple', 39.0, 1900, 'Your baby is the size of a pineapple', ARRAY['Pupils react to light', 'Baby\'s bones are hardening']),
+(34, '🥬', 'Cantaloupe', 40.0, 2100, 'Your baby is the size of a cantaloupe', ARRAY['Central nervous system maturing', 'Baby is gaining immune protection']),
+(35, '🍈', 'Honeydew', 41.0, 2300, 'Your baby is the size of a honeydew', ARRAY['Lungs are nearly mature', 'Baby is running out of room']),
+(36, '🥬', 'Romaine Lettuce', 42.0, 2500, 'Your baby is the size of romaine lettuce', ARRAY['Baby is shedding lanugo', 'Baby is practicing breathing']),
+(37, '🍉', 'Watermelon Slice', 43.0, 2700, 'Your baby is the size of a watermelon slice', ARRAY['Baby is full term', 'Baby is gaining weight rapidly']),
+(38, '🎃', 'Pumpkin', 44.0, 2900, 'Your baby is the size of a small pumpkin', ARRAY['Baby\'s organs are ready', 'Baby is in birth position']),
+(39, '🥬', 'Leek', 45.0, 3100, 'Your baby is the size of a leek', ARRAY['Baby\'s skin is pink and smooth', 'Baby is ready for birth']),
+(40, '🍉', 'Mini Watermelon', 46.0, 3300, 'Your baby is the size of a mini watermelon', ARRAY['Baby is full term', 'Labor could begin any day']),
+(41, '🎃', 'Small Pumpkin', 47.0, 3400, 'Your baby is the size of a small pumpkin', ARRAY['Baby is fully mature', 'Placenta is aging']),
+(42, '🍈', 'Small Melon', 48.0, 3500, 'Your baby is the size of a small melon', ARRAY['Baby is ready for the world', 'Expectant wait continues']);
+
+-- ============================================================
+-- TRIGGERS
+-- ============================================================
+
+CREATE OR REPLACE FUNCTION update_updated_at_column()
 RETURNS TRIGGER AS $$
 BEGIN
-  NEW.updated_at = NOW();
-  RETURN NEW;
+    NEW.updated_at = NOW();
+    RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE TRIGGER users_updated_at BEFORE UPDATE ON users
-  FOR EACH ROW EXECUTE FUNCTION update_timestamp();
-CREATE TRIGGER pregnancies_updated_at BEFORE UPDATE ON pregnancies
-  FOR EACH ROW EXECUTE FUNCTION update_timestamp();
-CREATE TRIGGER medications_updated_at BEFORE UPDATE ON medications
-  FOR EACH ROW EXECUTE FUNCTION update_timestamp();
-CREATE TRIGGER reminders_updated_at BEFORE UPDATE ON reminders
-  FOR EACH ROW EXECUTE FUNCTION update_timestamp();
-CREATE TRIGGER documents_updated_at BEFORE UPDATE ON documents
-  FOR EACH ROW EXECUTE FUNCTION update_timestamp();
-CREATE TRIGGER appointments_updated_at BEFORE UPDATE ON appointments
-  FOR EACH ROW EXECUTE FUNCTION update_timestamp();
-CREATE TRIGGER timeline_updated_at BEFORE UPDATE ON timeline_events
-  FOR EACH ROW EXECUTE FUNCTION update_timestamp();
+CREATE TRIGGER trg_users_updated_at BEFORE UPDATE ON users
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER trg_profiles_updated_at BEFORE UPDATE ON profiles
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER trg_pregnancies_updated_at BEFORE UPDATE ON pregnancies
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER trg_doctors_updated_at BEFORE UPDATE ON doctors
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER trg_appointments_updated_at BEFORE UPDATE ON appointments
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER trg_medications_updated_at BEFORE UPDATE ON medications
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER trg_documents_updated_at BEFORE UPDATE ON documents
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER trg_health_records_updated_at BEFORE UPDATE ON health_records
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER trg_hospitals_updated_at BEFORE UPDATE ON hospitals
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER trg_community_posts_updated_at BEFORE UPDATE ON community_posts
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER trg_community_comments_updated_at BEFORE UPDATE ON community_comments
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER trg_partner_links_updated_at BEFORE UPDATE ON partner_links
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER trg_ai_conversations_updated_at BEFORE UPDATE ON ai_conversations
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER trg_emergency_contacts_updated_at BEFORE UPDATE ON emergency_contacts
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER trg_notification_tokens_updated_at BEFORE UPDATE ON notification_tokens
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
--- ── SEED DEFAULT MOOD TYPES (reference data) ──
-CREATE TABLE mood_types (
-  id TEXT PRIMARY KEY,
-  label TEXT NOT NULL,
-  emoji TEXT NOT NULL
-);
-INSERT INTO mood_types VALUES
-  ('calm', 'Calm', '😌'),
-  ('excited', 'Excited', '✨'),
-  ('tired', 'Tired', '😴'),
-  ('anxious', 'Anxious', '🥺'),
-  ('happy', 'Happy', '😊'),
-  ('sad', 'Sad', '😢'),
-  ('energetic', 'Energetic', '⚡'),
-  ('nauseous', 'Nauseous', '🤢');
+-- ============================================================
+-- ROW-LEVEL SECURITY (for multi-tenant isolation)
+-- ============================================================
 
--- ── SEED BABY GROWTH REFERENCE DATA ──
-CREATE TABLE baby_growth (
-  week INTEGER PRIMARY KEY,
-  size_label TEXT NOT NULL,
-  size_emoji TEXT NOT NULL,
-  length_cm TEXT NOT NULL,
-  weight TEXT NOT NULL,
-  description TEXT NOT NULL,
-  development TEXT NOT NULL
-);
+ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE pregnancies ENABLE ROW LEVEL SECURITY;
+ALTER TABLE symptoms ENABLE ROW LEVEL SECURITY;
+ALTER TABLE weight_logs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE blood_pressure_logs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE baby_growth_logs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE mood_logs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE water_logs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE nutrition_logs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE appointments ENABLE ROW LEVEL SECURITY;
+ALTER TABLE doctors ENABLE ROW LEVEL SECURITY;
+ALTER TABLE medications ENABLE ROW LEVEL SECURITY;
+ALTER TABLE prescriptions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE reminders ENABLE ROW LEVEL SECURITY;
+ALTER TABLE emergency_contacts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE sos_alerts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE documents ENABLE ROW LEVEL SECURITY;
+ALTER TABLE health_records ENABLE ROW LEVEL SECURITY;
+ALTER TABLE ai_conversations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE ai_messages ENABLE ROW LEVEL SECURITY;
+ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
 
--- Seed all 40 weeks
-INSERT INTO baby_growth VALUES
-  (1, 'a poppy seed', '🌱', '0.1 cm', 'negligible', 'Fertilization has occurred. The zygote is forming.', 'Cell division begins as the embryo travels to the uterus.'),
-  (2, 'a tiny dot', '📍', '0.2 cm', 'negligible', 'The embryo has implanted in the uterine lining.', 'The placenta begins to form.'),
-  (3, 'a sesame seed', '🫘', '0.3 cm', 'less than 1g', 'The neural tube is forming — the foundation of the brain and spine.', 'The heart begins to beat around day 22.'),
-  (4, 'a poppy seed', '🌱', '0.5 cm', 'less than 1g', 'The embryo is now the size of a poppy seed.', 'The heart is beating and the circulatory system is working.'),
-  (5, 'a raspberry', '🍇', '1.2 cm', 'less than 1g', 'The baby is the size of a raspberry.', 'Eyes, ears, and nose are starting to form.'),
-  (6, 'a lentil', '🫘', '1.5 cm', 'less than 1g', 'The baby looks like a tiny tadpole with a tail.', 'The heart is beating 110-160 times per minute.'),
-  (7, 'a blueberry', '🫐', '2.0 cm', 'less than 1g', 'The baby doubles in size each week.', 'Arm and leg buds are visible.'),
-  (8, 'a kidney bean', '🫘', '2.5 cm', '4g', 'The baby is the size of a kidney bean.', 'Webbed fingers and toes are forming.'),
-  (9, 'a grape', '🍇', '3.0 cm', '7g', 'The baby is the size of a grape.', 'The tail has disappeared.'),
-  (10, 'a prune', '🫐', '3.5 cm', '10g', 'The baby is the size of a prune.', 'The ears are fully formed.'),
-  (11, 'a lime', '🍋', '5.0 cm', '15g', 'The baby is the size of a lime.', 'The baby can open and close their fists.'),
-  (12, 'a plum', '🍑', '6.0 cm', '28g', 'The baby is the size of a plum.', 'The brain is developing rapidly.'),
-  (13, 'a peach', '🍑', '7.5 cm', '42g', 'The baby is the size of a peach.', 'Vocal cords are forming.'),
-  (14, 'a lemon', '🍋', '9.0 cm', '55g', 'The baby is the size of a lemon.', 'The baby can make facial expressions.'),
-  (15, 'an apple', '🍎', '10.0 cm', '75g', 'The baby is the size of an apple.', 'The baby can hiccup.'),
-  (16, 'an avocado', '🥑', '12.0 cm', '100g', 'The baby is the size of an avocado.', 'The baby can hear your voice.'),
-  (17, 'a pear', '🍐', '13.0 cm', '140g', 'The baby is the size of a pear.', 'The baby is developing a sleep-wake cycle.'),
-  (18, 'a bell pepper', '🫑', '14.0 cm', '190g', 'The baby is the size of a bell pepper.', 'The baby can yawn and stretch.'),
-  (19, 'a mango', '🥭', '15.0 cm', '240g', 'The baby is the size of a mango.', 'The baby is covered in vernix caseosa.'),
-  (20, 'a banana', '🍌', '16.0 cm', '300g', 'The baby is the size of a banana.', 'The baby can swallow amniotic fluid.'),
-  (21, 'a carrot', '🥕', '18.0 cm', '360g', 'The baby is the size of a carrot.', 'The baby has developed taste buds.'),
-  (22, 'a papaya', '🌿', '20.0 cm', '430g', 'The baby is the size of a papaya.', 'The baby has eyebrows and eyelashes.'),
-  (23, 'a grapefruit', '🍊', '22.0 cm', '500g', 'The baby is the size of a grapefruit.', 'The baby has a regular sleep cycle.'),
-  (24, 'an ear of corn', '🌽', '24.0 cm', '600g', 'The baby is the size of an ear of corn.', 'The baby can hear loud noises.'),
-  (25, 'a rutabaga', '🥬', '26.0 cm', '660g', 'The baby is the size of a rutabaga.', 'The baby is starting to put on fat.'),
-  (26, 'a coconut', '🥥', '28.0 cm', '760g', 'The baby is the size of a coconut.', 'The baby\'s lungs are developing.'),
-  (27, 'a cauliflower', '🥦', '30.0 cm', '875g', 'The baby is the size of a cauliflower.', 'The baby can open their eyes.'),
-  (28, 'an eggplant', '🍆', '31.0 cm', '1.0 kg', 'The baby is the size of an eggplant.', 'The baby\'s brain is developing billions of neurons.'),
-  (29, 'a butternut squash', '🎃', '33.0 cm', '1.1 kg', 'The baby is the size of a butternut squash.', 'The baby can kick and stretch strongly.'),
-  (30, 'a cabbage', '🥬', '34.0 cm', '1.3 kg', 'The baby is the size of a cabbage.', 'The baby\'s five senses are fully developed.'),
-  (31, 'a pineapple', '🍍', '36.0 cm', '1.5 kg', 'The baby is the size of a pineapple.', 'The baby is gaining about 200g per week.'),
-  (32, 'a large jicama', '🥔', '37.0 cm', '1.7 kg', 'The baby is the size of a large jicama.', 'The baby\'s toenails are visible.'),
-  (33, 'a honeydew', '🍈', '38.0 cm', '1.9 kg', 'The baby is the size of a honeydew.', 'The baby\'s bones are hardening.'),
-  (34, 'a cantaloupe', '🍈', '39.0 cm', '2.1 kg', 'The baby is the size of a cantaloupe.', 'The baby is preparing for birth.'),
-  (35, 'a watermelon', '🍉', '40.0 cm', '2.3 kg', 'The baby is the size of a watermelon.', 'The baby\'s lungs are almost fully mature.'),
-  (36, 'a bunch of kale', '🥬', '41.0 cm', '2.5 kg', 'The baby is the size of a bunch of kale.', 'The baby is in the final position for birth.'),
-  (37, 'a winter melon', '🍈', '42.0 cm', '2.7 kg', 'The baby is the size of a winter melon.', 'The baby is losing the vernix caseosa.'),
-  (38, 'a rhubarb bunch', '🥬', '43.0 cm', '3.0 kg', 'The baby is the size of a rhubarb bunch.', 'The baby\'s head is engaged in the pelvis.'),
-  (39, 'a mini watermelon', '🍉', '44.0 cm', '3.2 kg', 'The baby is the size of a mini watermelon.', 'The baby is ready for birth.'),
-  (40, 'a small pumpkin', '🎃', '45.0 cm', '3.4 kg', 'The baby is the size of a small pumpkin.', 'Full term! The baby is ready to meet you.'),
-  (41, 'a large pumpkin', '🎃', '46.0 cm', '3.6 kg', 'The baby is the size of a large pumpkin.', 'Post-term — discuss induction with your doctor.'),
-  (42, 'a huge pumpkin', '🎃', '47.0 cm', '3.8 kg', 'The baby is the size of a huge pumpkin.', 'Post-term — induction is typically recommended.');
-
--- ── SEED DIETARY REFERENCE DATA ──
-CREATE TABLE diet_recommendations (
-  region TEXT NOT NULL,
-  category TEXT NOT NULL CHECK (category IN ('to_eat', 'to_avoid')),
-  name TEXT NOT NULL,
-  reason TEXT NOT NULL,
-  emoji TEXT DEFAULT '',
-  sort_order INTEGER DEFAULT 0
-);
--- Seed data for each region would be inserted here
--- For brevity, showing a representative sample:
-INSERT INTO diet_recommendations VALUES
-  ('north_india', 'to_eat', 'Dal & Rice', 'Rich in protein and energy', '🍚', 1),
-  ('north_india', 'to_eat', 'Palak Paneer', 'Iron and calcium for baby', '🥬', 2),
-  ('north_india', 'to_eat', 'Whole Wheat Roti', 'Fiber-rich for digestion', '🫓', 3),
-  ('north_india', 'to_eat', 'Ghee in Moderation', 'Healthy fats for brain development', '🧈', 4),
-  ('north_india', 'to_eat', 'Seasonal Fruits', 'Natural vitamins and hydration', '🍎', 5),
-  ('north_india', 'to_eat', 'Yogurt (Dahi)', 'Probiotics and calcium', '🥛', 6),
-  ('north_india', 'to_avoid', 'Raw Papaya', 'Can cause early contractions', '🚫', 1),
-  ('north_india', 'to_avoid', 'Excessive Caffeine', 'Can affect baby\'s heart rate', '☕', 2),
-  ('north_india', 'to_avoid', 'Street Food', 'Risk of bacteria and hygiene concerns', '🌮', 3),
-  ('north_india', 'to_avoid', 'Unpasteurized Milk', 'Risk of listeria infection', '🥛', 4);
-
--- ── SEED INSIGHT REFERENCE DATA ──
-CREATE TABLE pregnancy_insights (
-  week INTEGER NOT NULL,
-  insight_text TEXT NOT NULL,
-  tip_text TEXT NOT NULL,
-  exercise_text TEXT DEFAULT '',
-  category TEXT DEFAULT 'general'
-);
-INSERT INTO pregnancy_insights VALUES
-  (1, 'Your body is working hard creating new life. The tiny cluster of cells is already growing rapidly.', 'Take folic acid daily if you haven\'t already. Stay hydrated and avoid alcohol.', 'Short 10-minute walks', 'nutrition'),
-  (8, 'The baby\'s heart is beating! All major organs have begun forming.', 'Eat small, frequent meals. Ginger tea can help with morning sickness naturally.', 'Gentle stretching and pelvic tilts', 'medical'),
-  (12, 'The risk of miscarriage drops significantly after this week. The baby is now fully formed.', 'Announce your pregnancy if you feel ready! Start looking into prenatal classes.', 'Swimming or water aerobics (low impact)', 'emotional'),
-  (16, 'The baby can hear your voice! The tiny ears are fully developed.', 'Play gentle music, talk to your bump. Your baby recognizes your voice.', 'Prenatal yoga — cat-cow and child\'s pose', 'emotional'),
-  (20, 'Halfway there! The baby is active and you may feel the first fluttering movements.', 'Start tracking kicks. Begin researching baby gear and nursery setup.', 'Walking 20 minutes daily with proper posture', 'exercise'),
-  (24, 'The baby has a regular sleep-wake cycle and can respond to touch.', 'Practice mindfulness or meditation. Start perineal massage preparation.', 'Kegel exercises — 3 sets of 10 daily', 'exercise'),
-  (28, 'The baby\'s brain is forming billions of neurons each day.', 'Keep up your iron intake. Start preparing your hospital bag.', 'Prenatal Pilates — focus on core and pelvic floor', 'medical'),
-  (32, 'The baby is gaining about 200g per week and practicing breathing movements.', 'Rest on your left side for best blood flow. Watch for swelling.', 'Birth ball exercises and gentle squats', 'exercise'),
-  (36, 'The baby is in the final position for birth. Almost ready!', 'Pack your hospital bag. Confirm your birth plan with your doctor.', 'Walking and gentle hip circles to encourage optimal positioning', 'general'),
-  (40, 'Full term! Your baby can arrive any day now. You\'ve done an incredible job carrying this little one.', 'Trust your body. Rest as much as you can before the big day. Celebrate this moment!', 'Light walking only — conserve energy for labor', 'emotional');
-
--- ── BODY CHANGES REFERENCE ──
-CREATE TABLE body_changes (
-  id TEXT PRIMARY KEY,
-  symptom TEXT NOT NULL,
-  title TEXT NOT NULL,
-  explanation TEXT NOT NULL,
-  emoji TEXT DEFAULT '',
-  tips TEXT[] DEFAULT '{}',
-  when_to_worry TEXT DEFAULT ''
-);
-INSERT INTO body_changes VALUES
-  ('back_pain', 'Back Pain', 'Back Pain is Very Common', 'As your belly grows, your center of gravity shifts forward. This puts extra strain on your lower back muscles. The hormone relaxin also loosens your ligaments, which can contribute to discomfort.', '🔙', ARRAY['Take rest and avoid standing for long periods', 'Use a pregnancy pillow while sleeping', 'Try prenatal yoga or gentle stretches', 'Apply a warm compress to the sore area'], 'See a doctor if the pain is severe, persistent, or accompanied by fever or bleeding.'),
-  ('swelling', 'Swelling', 'Mild Swelling is Normal', 'Your body produces about 50% more blood and fluids during pregnancy to support the baby. This extra fluid can collect in your feet, ankles, and hands, causing mild edema.', '🦶', ARRAY['Elevate your feet when sitting', 'Drink plenty of water to flush excess fluids', 'Avoid standing for too long', 'Wear comfortable, supportive shoes'], 'Contact your doctor if swelling is sudden, severe, or accompanied by headache or vision changes.'),
-  ('nausea', 'Nausea', 'Morning Sickness Can Happen Any Time', 'Rising hormone levels, especially hCG, can trigger nausea and vomiting. Despite its name, morning sickness can strike at any time of day. It usually peaks around week 9 and improves by week 14.', '🤢', ARRAY['Eat small, frequent meals throughout the day', 'Keep crackers by your bedside for morning', 'Avoid strong smells and greasy foods', 'Ginger tea or lemon water can help settle your stomach'], 'Contact your doctor if you cannot keep any food or water down for 24 hours.'),
-  ('fatigue', 'Fatigue', 'Extreme Tiredness is Normal', 'Your body is working overtime to grow a baby. High progesterone levels can make you feel sleepy, and your body is using enormous amounts of energy for fetal development.', '😴', ARRAY['Take short naps when needed (20-30 minutes)', 'Go to bed earlier than usual', 'Stay hydrated and eat iron-rich foods', 'Light exercise can boost your energy levels'], 'See your doctor if fatigue is extreme or accompanied by shortness of breath or pale skin.'),
-  ('heartburn', 'Heartburn', 'Heartburn is Common in Pregnancy', 'Progesterone relaxes the valve between your stomach and esophagus, allowing stomach acid to flow upward. Later in pregnancy, the growing uterus also presses on your stomach.', '🔥', ARRAY['Eat smaller meals more frequently', 'Avoid spicy, fried, or acidic foods', 'Don\'t lie down immediately after eating', 'Sleep with your head slightly elevated'], 'Contact your doctor if heartburn is severe or accompanied by difficulty swallowing.'),
-  ('headache', 'Headache', 'Hormonal Headaches are Common', 'Increased blood flow and hormonal changes can trigger tension headaches. These are most common in the first trimester and usually improve as your body adjusts.', '🤕', ARRAY['Rest in a dark, quiet room', 'Stay hydrated throughout the day', 'Apply a cold or warm compress to your head', 'Practice relaxation techniques like deep breathing'], 'Contact your doctor immediately if headaches are severe, persistent, or accompanied by vision changes.'),
-  ('cramping', 'Cramping', 'Mild Cramping Can Be Normal', 'As your uterus expands and stretches, you may feel mild cramping similar to period cramps. This is called round ligament pain and is very common in the second trimester.', '😣', ARRAY['Rest and change positions slowly', 'Apply a warm compress (not hot)', 'Try gentle stretching exercises', 'Stay hydrated to prevent Braxton Hicks contractions'], 'Contact your doctor if cramping is severe, regular, or accompanied by bleeding.');
+-- User can only access their own data
+CREATE POLICY user_isolation ON profiles
+    USING (user_id = auth.uid());
+CREATE POLICY user_isolation ON pregnancies
+    USING (user_id = auth.uid());
+CREATE POLICY user_isolation ON symptoms
+    USING (user_id = auth.uid());
+CREATE POLICY user_isolation ON weight_logs
+    USING (user_id = auth.uid());
+CREATE POLICY user_isolation ON blood_pressure_logs
+    USING (user_id = auth.uid());
+CREATE POLICY user_isolation ON baby_growth_logs
+    USING (user_id = auth.uid());
+CREATE POLICY user_isolation ON mood_logs
+    USING (user_id = auth.uid());
+CREATE POLICY user_isolation ON water_logs
+    USING (user_id = auth.uid());
+CREATE POLICY user_isolation ON nutrition_logs
+    USING (user_id = auth.uid());
+CREATE POLICY user_isolation ON appointments
+    USING (user_id = auth.uid());
+CREATE POLICY user_isolation ON doctors
+    USING (user_id = auth.uid());
+CREATE POLICY user_isolation ON medications
+    USING (user_id = auth.uid());
+CREATE POLICY user_isolation ON prescriptions
+    USING (user_id = auth.uid());
+CREATE POLICY user_isolation ON reminders
+    USING (user_id = auth.uid());
+CREATE POLICY user_isolation ON emergency_contacts
+    USING (user_id = auth.uid());
+CREATE POLICY user_isolation ON sos_alerts
+    USING (user_id = auth.uid());
+CREATE POLICY user_isolation ON documents
+    USING (user_id = auth.uid());
+CREATE POLICY user_isolation ON health_records
+    USING (user_id = auth.uid());
+CREATE POLICY user_isolation ON ai_conversations
+    USING (user_id = auth.uid());
+CREATE POLICY user_isolation ON notifications
+    USING (user_id = auth.uid());
