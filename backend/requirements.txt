@@ -1,16 +1,32 @@
-fastapi>=0.115.0
-uvicorn[standard]>=0.31.0
-sqlalchemy>=2.0.36
-psycopg2-binary>=2.9.10
-alembic>=1.14.0
-python-multipart>=0.0.12
-pydantic>=2.9.2
-pydantic-settings>=2.6.0
-python-jose[cryptography]>=3.3.0
-passlib[bcrypt]>=1.7.4
-python-dotenv>=1.0.1
-pdfminer.six>=20240706
-pillow>=11.0.0
-pytesseract>=0.3.13
-pytest>=8.3.4
-httpx>=0.28.0
+# =============================================================================
+# Little Heartbeat — Backend Dependencies
+# =============================================================================
+# Runtime
+fastapi>=0.115.0,<0.116
+uvicorn[standard]>=0.34.0,<0.35
+sqlalchemy[asyncio]>=2.0.36,<2.1
+asyncpg==0.30.0
+alembic>=1.14.0,<1.15
+python-multipart>=0.0.12,<0.1
+pydantic>=2.10.0,<2.11
+pydantic-settings>=2.7.0,<2.8
+python-dotenv>=1.0.1,<1.1
+
+# Authentication
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+bcrypt==4.2.1
+
+# AI
+google-generativeai>=0.8,<0.10
+
+# HTTP
+httpx>=0.28.0,<0.29
+
+# Notifications
+pywebpush>=1.14,<1.15
+
+# Development
+pytest>=8.3,<8.4
+pytest-asyncio>=0.25,<0.26
+pytest-cov>=6.0,<6.1
