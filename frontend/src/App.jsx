@@ -7,6 +7,9 @@ import UploadPage from './pages/main/UploadPage.jsx';
 import CarePage from './pages/main/CarePage.jsx';
 import JourneyPage from './pages/main/JourneyPage.jsx';
 import SOSPage from './pages/main/SOSPage.jsx';
+import BabyPage from './pages/main/BabyPage.jsx';
+import AIPage from './pages/main/AIPage.jsx';
+import ProfilePage from './pages/main/ProfilePage.jsx';
 
 export default function App() {
   return (
@@ -17,7 +20,10 @@ export default function App() {
           <Route path="upload" element={<UploadPage />} />
           <Route path="care" element={<CarePage />} />
           <Route path="journey" element={<JourneyPage />} />
+          <Route path="baby" element={<BabyPage />} />
+          <Route path="ai" element={<AIPage />} />
           <Route path="sos" element={<SOSPage />} />
+          <Route path="profile" element={<ProfilePage />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

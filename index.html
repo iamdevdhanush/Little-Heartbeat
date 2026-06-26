@@ -3,90 +3,373 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <meta name="theme-color" content="#E8517A">
+  <meta name="theme-color" content="#FAF6F0">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Little Heartbeat">
   <meta name="application-name" content="Little Heartbeat">
-  <meta name="description" content="Little Heartbeat — Your Pregnancy Operating System. Track your journey, manage medications, and keep your health records safe.">
+  <meta name="description" content="Little Heartbeat — AI Pregnancy Companion. Track your journey, manage medications, and keep your health records safe.">
   <meta name="mobile-web-app-capable" content="yes">
-  
+
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=Geist:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
-  
-  <title>Little Heartbeat — Pregnancy OS</title>
-  
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=Geist:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+  <title>Little Heartbeat — AI Pregnancy Companion</title>
+
   <style>
     *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
-    
+
+    :root {
+      --color-ivory: #FAF6F0;
+      --color-blush: #FDF5F7;
+      --color-lavender: #F8F4FA;
+      --color-heart: #D4A0A0;
+      --color-heart-glow: rgba(212, 160, 160, 0.08);
+      --color-title: #2D2338;
+      --color-subtitle: #A0919E;
+      --color-message: #B8A8B4;
+      --color-particle-1: rgba(212, 160, 160, 0.25);
+      --color-particle-2: rgba(200, 180, 220, 0.2);
+      --color-particle-3: rgba(232, 208, 208, 0.3);
+      --pulse-ring-color: rgba(212, 160, 160, 0.15);
+      --font-serif: 'Cormorant Garamond', 'Georgia', 'Times New Roman', serif;
+      --font-sans: 'Geist', 'Inter', system-ui, -apple-system, sans-serif;
+    }
+
     html, body {
       height: 100%;
       width: 100%;
       overflow: hidden;
-      background-color: #FCFBFF;
-      font-family: 'Geist', 'Inter', system-ui, -apple-system, sans-serif;
-      font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+      background: var(--color-ivory);
+      font-family: var(--font-sans);
       -webkit-font-smoothing: antialiased;
       -moz-osx-font-smoothing: grayscale;
       touch-action: manipulation;
       -webkit-tap-highlight-color: transparent;
       user-select: none;
     }
-    
-    #root { height: 100%; width: 100%; display: flex; flex-direction: column; }
-    
-    .app-loading {
-      position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-      display: flex; flex-direction: column; align-items: center; justify-content: center;
-      background: #FCFBFF; z-index: 9999;
+
+    #root {
+      height: 100%;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
     }
-    
-    .app-loading .icon {
-      font-size: 48px; margin-bottom: 20px; width: 88px; height: 88px;
-      display: flex; align-items: center; justify-content: center;
-      background: linear-gradient(135deg, #F0EEFF 0%, #F8F5FF 100%);
-      border-radius: 28px; box-shadow: 0 8px 32px rgba(91, 91, 214, 0.12);
+
+    /* ── Loading Screen ── */
+    #loading-screen {
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(180deg, #FAF6F0 0%, #FDF5F7 50%, #F8F4FA 100%);
+      will-change: transform, opacity;
     }
-    
-    .app-loading .title {
-      font-family: 'Cormorant Garamond', 'Georgia', serif;
-      font-size: 36px; font-weight: 700; color: #2D2338; margin-bottom: 4px;
+
+    #loading-screen.transitioning {
+      pointer-events: none;
+    }
+
+    #loading-screen.hidden {
+      display: none;
+    }
+
+    /* ── Particles ── */
+    #particles {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      overflow: hidden;
+    }
+
+    .particle {
+      position: absolute;
+      border-radius: 50%;
+      will-change: transform, opacity;
+      animation: float-up linear infinite;
+    }
+
+    @keyframes float-up {
+      0% {
+        transform: translateY(0) translateX(0);
+        opacity: 0;
+      }
+      10% {
+        opacity: var(--p-opacity, 0.2);
+      }
+      85% {
+        opacity: var(--p-opacity, 0.2);
+      }
+      100% {
+        transform: translateY(-120vh) translateX(var(--p-drift, 30px));
+        opacity: 0;
+      }
+    }
+
+    /* ── Loader Content ── */
+    .loader-content {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 0 24px;
+      padding-top: max(env(safe-area-inset-top, 0px), 20px);
+      padding-bottom: max(env(safe-area-inset-bottom, 0px), 20px);
+      position: relative;
+      z-index: 1;
+      will-change: transform, opacity;
+    }
+
+    #loading-screen.transitioning .loader-content {
+      animation: content-exit 0.8s cubic-bezier(0.45, 0, 0.1, 1) both;
+    }
+
+    @keyframes content-exit {
+      0% {
+        opacity: 1;
+        transform: scale(1);
+      }
+      100% {
+        opacity: 0;
+        transform: scale(0.92);
+      }
+    }
+
+    /* ── Logo ── */
+    .logo-wrapper {
+      position: relative;
+      width: 88px;
+      height: 88px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 28px;
+    }
+
+    .logo-heart {
+      width: 80px;
+      height: 74px;
+      position: relative;
+      z-index: 2;
+      animation: heartbeat 1.5s ease-in-out infinite;
+      will-change: transform;
+    }
+
+    .logo-heart .heart-fill {
+      fill: var(--color-heart-glow);
+      stroke: var(--color-heart);
+      stroke-width: 1.5;
+      stroke-linejoin: round;
+      stroke-linecap: round;
+    }
+
+    .logo-heart .heart-dot {
+      fill: var(--color-heart);
+      opacity: 0.35;
+    }
+
+    .pulse-ring {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 72px;
+      height: 72px;
+      margin: -36px 0 0 -36px;
+      border-radius: 50%;
+      border: 1px solid var(--pulse-ring-color);
+      animation: pulse-expand 2.5s cubic-bezier(0.25, 0.1, 0.25, 1) infinite;
+      will-change: transform, opacity;
+    }
+
+    .pulse-ring.ring-2 {
+      animation-delay: 1.25s;
+    }
+
+    @keyframes pulse-expand {
+      0% {
+        transform: scale(0.85);
+        opacity: 0.6;
+      }
+      100% {
+        transform: scale(1.9);
+        opacity: 0;
+      }
+    }
+
+    @keyframes heartbeat {
+      0%, 100% { transform: scale(1); }
+      14% { transform: scale(1.08); }
+      28% { transform: scale(1); }
+      42% { transform: scale(1.04); }
+      56% { transform: scale(1); }
+    }
+
+    /* ── Typography ── */
+    .brand-title {
+      font-family: var(--font-serif);
+      font-size: 34px;
+      font-weight: 700;
+      color: var(--color-title);
       letter-spacing: -0.02em;
-      font-feature-settings: 'lnum', 'pnum';
+      line-height: 1.15;
+      text-align: center;
+      font-feature-settings: 'lnum', 'pnum', 'liga';
+      margin-bottom: 6px;
     }
-    
-    .app-loading .subtitle { font-size: 14px; color: #6C6278; }
-    
-    .app-loading .bar {
-      margin-top: 36px; width: 140px; height: 3px;
-      background: rgba(91, 91, 214, 0.1); border-radius: 99px; overflow: hidden;
+
+    .brand-subtitle {
+      font-family: var(--font-sans);
+      font-size: 14px;
+      font-weight: 400;
+      color: var(--color-subtitle);
+      letter-spacing: 0.03em;
+      text-align: center;
+      margin-bottom: 40px;
     }
-    
-    .app-loading .bar-inner {
-      height: 100%; width: 35%;
-      background: linear-gradient(90deg, #5B5BD6, #7C9AFF);
-      border-radius: 99px;
-      animation: bar 1.4s ease-in-out infinite;
+
+    .loading-message {
+      font-family: var(--font-sans);
+      font-size: 13px;
+      font-weight: 400;
+      color: var(--color-message);
+      letter-spacing: 0.02em;
+      text-align: center;
+      transition: opacity 0.4s ease;
+      min-height: 1.4em;
+      will-change: opacity;
     }
-    
-    @keyframes bar {
-      0% { transform: translateX(-100%); }
-      100% { transform: translateX(385%); }
+
+    /* ── Safe area padding ── */
+    @supports (padding: max(0px)) {
+      .loader-content {
+        padding-left: max(24px, env(safe-area-inset-left, 0px));
+        padding-right: max(24px, env(safe-area-inset-right, 0px));
+      }
     }
-    
   </style>
 </head>
 <body>
-  <div id="root">
-    <div class="app-loading">
-      <div class="icon">💗</div>
-      <div class="title">Little Heartbeat</div>
-      <div class="subtitle">Your Pregnancy OS</div>
-      <div class="bar"><div class="bar-inner"></div></div>
+  <div id="loading-screen">
+    <div id="particles"></div>
+    <div class="loader-content">
+      <div class="logo-wrapper">
+        <svg class="logo-heart" viewBox="0 0 100 88" fill="none" aria-label="Little Heartbeat">
+          <path class="heart-fill" d="M50 84 C24 62 6 46 6 28 C6 16 16 6 28 6 C38 6 46 12 50 22 C54 12 62 6 72 6 C84 6 94 16 94 28 C94 46 76 62 50 84Z" />
+          <circle class="heart-dot" cx="50" cy="37" r="3" />
+        </svg>
+        <div class="pulse-ring"></div>
+        <div class="pulse-ring ring-2"></div>
+      </div>
+      <h1 class="brand-title">Little Heartbeat</h1>
+      <p class="brand-subtitle">AI Pregnancy Companion</p>
+      <p class="loading-message" id="loadingMessage">Preparing your journey...</p>
     </div>
   </div>
-  
-  <script type="module" src="/src/main.jsx"></script>
+
+  <div id="root"></div>
+
+  <script type="module" src="/frontend/src/main.jsx"></script>
+
+  <script>
+    (function() {
+      'use strict';
+
+      var loadingScreen = document.getElementById('loading-screen');
+      var root = document.getElementById('root');
+      var messageEl = document.getElementById('loadingMessage');
+      var particlesContainer = document.getElementById('particles');
+
+      // ── Particles ──
+      var particleColors = [
+        'var(--color-particle-1)',
+        'var(--color-particle-2)',
+        'var(--color-particle-3)'
+      ];
+
+      for (var i = 0; i < 20; i++) {
+        var p = document.createElement('div');
+        p.className = 'particle';
+        var size = 2 + Math.random() * 3.5;
+        var opacity = 0.12 + Math.random() * 0.18;
+        p.style.cssText = [
+          'width:' + size + 'px;',
+          'height:' + size + 'px;',
+          'left:' + (Math.random() * 100) + '%;',
+          'bottom:' + (Math.random() * 30) + '%;',
+          'background:' + particleColors[i % particleColors.length] + ';',
+          '--p-opacity:' + opacity + ';',
+          '--p-drift:' + (-15 + Math.random() * 30) + 'px;',
+          'animation-duration:' + (14 + Math.random() * 16) + 's;',
+          'animation-delay:' + (Math.random() * 12) + 's;'
+        ].join('');
+        particlesContainer.appendChild(p);
+      }
+
+      // ── Rotating Messages ──
+      var messages = [
+        'Preparing your journey...',
+        "Creating your baby's timeline...",
+        'Loading your pregnancy companion...',
+        'Getting everything ready...',
+        'Connecting to your little one...'
+      ];
+
+      var msgIndex = 0;
+      var msgInterval = setInterval(function() {
+        msgIndex = (msgIndex + 1) % messages.length;
+        messageEl.style.opacity = '0';
+        setTimeout(function() {
+          messageEl.textContent = messages[msgIndex];
+          messageEl.style.opacity = '1';
+        }, 400);
+      }, 3200);
+
+      // ── Transition Out ──
+      var MIN_DISPLAY = 2200;
+      var MAX_DISPLAY = 8000;
+      var startTime = Date.now();
+      var transitioned = false;
+
+      function transitionOut() {
+        if (transitioned) return;
+        transitioned = true;
+
+        var elapsed = Date.now() - startTime;
+        var delay = Math.max(0, MIN_DISPLAY - elapsed);
+
+        clearInterval(msgInterval);
+
+        setTimeout(function() {
+          loadingScreen.classList.add('transitioning');
+          setTimeout(function() {
+            loadingScreen.classList.add('hidden');
+          }, 800);
+        }, delay);
+      }
+
+      // Observe #root for React mount
+      var observer = new MutationObserver(function() {
+        if (root.children.length > 0) {
+          observer.disconnect();
+          transitionOut();
+        }
+      });
+
+      if (root.children.length > 0) {
+        transitionOut();
+      } else {
+        observer.observe(root, { childList: true });
+      }
+
+      // Fallback timeout
+      setTimeout(function() {
+        observer.disconnect();
+        if (!transitioned) transitionOut();
+      }, MAX_DISPLAY);
+    })();
+  </script>
 </body>
 </html>

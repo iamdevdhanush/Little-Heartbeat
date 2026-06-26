@@ -73,11 +73,11 @@ export default defineConfig({
     }),
   ],
   resolve: {
-    alias: { '@': '/src' },
+    alias: { '@': '/frontend/src' },
   },
   esbuild: {
     loader: 'jsx',
-    include: /src\/.*\.[jt]sx?$/,
+    include: /frontend\/src\/.*\.[jt]sx?$/,
     exclude: [],
   },
   optimizeDeps: {

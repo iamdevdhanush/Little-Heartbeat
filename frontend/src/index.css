@@ -8,39 +8,48 @@
 /* ── Design Tokens ── */
 :root {
   /* === COLOR SYSTEM === */
-  --color-primary:      #5B5BD6; /* Deep Indigo — Trust, Safety, Intelligence */
+  --color-primary:      #5B5BD6; /* Deep Indigo — Trust, Safety, Guidance */
   --color-primary-dark: #4747B8;
   --color-primary-mid:  #7C9AFF; /* Soft Blue — Guidance */
   --color-primary-tint: #F0EEFF; /* Light Indigo Tint */
-  --color-accent:       #7C9AFF;
+  --color-accent:       #FFA089; /* Muted Coral */
 
-  --color-background:   #FCFBFF; /* Lavender White — Comfort, Warmth */
+  /* Premium Soft Warm Color Palette */
+  --color-soft-white:   #FDFCFF; /* Soft White */
+  --color-warm-ivory:   #FAF6F0; /* Warm Ivory */
+  --color-blush-pink:   #FCE4E4; /* Blush Pink */
+  --color-peach:        #FCECDD; /* Peach */
+  --color-lavender:     #F3ECFC; /* Lavender */
+  --color-sage-green:   #E6F2EB; /* Very Light Sage Green */
+  --color-muted-coral:  #FFA089; /* Muted Coral */
+
+  --color-background:   #FAF6F0; /* Default background is Warm Ivory for comfort */
   --color-surface:      #FFFFFF;
-  --color-surface-tint: #F8F5FF; /* Lavender card tint */
+  --color-surface-tint: #FDFCFF; /* Soft White card surface */
 
   --color-success:      #2FBF71; /* Natural Green — Healthy Progress */
-  --color-success-tint: #E8FAF0;
+  --color-success-tint: #E6F2EB;
   --color-warning:      #FFB648; /* Warm Amber */
-  --color-warning-tint: #FFF8EC;
-  --color-danger:       #FF6B6B; /* Soft Coral — NEVER pure red */
-  --color-danger-tint:  #FFF0F0;
-  --color-danger-dark:  #E85555;
+  --color-warning-tint: #FCEDC5;
+  --color-danger:       #FFA089; /* Muted Coral / Soft Coral — NEVER pure red */
+  --color-danger-tint:  #FCE4E4;
+  --color-danger-dark:  #E57E67;
 
   --color-text-primary:   #2D2338;
   --color-text-secondary: #6C6278;
   --color-text-muted:     #B0A8C0;
   --color-text-on-primary: #FFFFFF;
 
-  --color-border:         rgba(91, 91, 214, 0.08);
-  --color-border-medium:  rgba(91, 91, 214, 0.16);
-  --color-border-strong:  rgba(91, 91, 214, 0.24);
+  --color-border:         rgba(91, 91, 214, 0.06);
+  --color-border-medium:  rgba(91, 91, 214, 0.12);
+  --color-border-strong:  rgba(91, 91, 214, 0.20);
 
   /* === GRADIENT SYSTEM === */
   --gradient-primary:    linear-gradient(135deg, #5B5BD6 0%, #7C9AFF 100%);
   --gradient-primary-v:  linear-gradient(180deg, #5B5BD6 0%, #7C9AFF 100%);
-  --gradient-soft:       linear-gradient(180deg, #F8F5FF 0%, #FFFFFF 100%);
-  --gradient-hero:       linear-gradient(135deg, #4D4DC8 0%, #5B5BD6 50%, #7C9AFF 100%);
-  --gradient-danger:     linear-gradient(135deg, #FF6B6B 0%, #FF8E53 100%);
+  --gradient-soft:       linear-gradient(180deg, #FDFCFF 0%, #FAF6F0 100%);
+  --gradient-hero:       linear-gradient(135deg, #5B5BD6 0%, #7C9AFF 100%);
+  --gradient-danger:     linear-gradient(135deg, #FFA089 0%, #FFBCA3 100%);
 
   /* === TYPOGRAPHY === */
   --font-serif: 'Cormorant Garamond', 'Georgia', 'Times New Roman', serif;
@@ -714,6 +723,13 @@ h4, .h4, .sans-title {
 .bg-surface  { background: var(--color-surface); }
 .bg-danger   { background: var(--color-danger); }
 .bg-success  { background: var(--color-success); }
+.bg-soft-white { background: var(--color-soft-white); }
+.bg-warm-ivory { background: var(--color-warm-ivory); }
+.bg-blush-pink { background: var(--color-blush-pink); }
+.bg-peach      { background: var(--color-peach); }
+.bg-lavender   { background: var(--color-lavender); }
+.bg-sage-green { background: var(--color-sage-green); }
+.bg-muted-coral { background: var(--color-muted-coral); }
 
 /* Divider */
 .divider {
